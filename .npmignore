@@ -1,0 +1,35 @@
+# Development
+node_modules/
+.vscode/
+.idea/
+.git/
+.github/
+.cursor/
+.devcontainer/
+memory-bank/
+
+# Source files (since we publish only the dist)
+packages/
+examples/
+
+# Config files
+.gitignore
+.prettierrc
+eslint.config.js
+vite.config.ts
+vite.examples.config.ts
+vitest.config.ts
+tsconfig*.json
+
+# Project files
+CONTRIBUTING.md
+index.html
+bun.lock
+*.lock
+
+# Tests
+*.test.ts
+*.spec.ts
+
+# Build artifacts
+*.tsbuildinfo 
