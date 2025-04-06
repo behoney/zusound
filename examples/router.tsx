@@ -1,88 +1,53 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import {
+  BrowserRouter,
+  Routes as RouterRoutes,
+  Route as RouterRoute,
+  Link as RouterLink,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom'
+import React from 'react'
 
-// Simple context for routing
-interface RouterContextType {
-  currentPath: string
-  navigate: (to: string) => void
-}
-
-const RouterContext = createContext<RouterContextType>({
-  currentPath: '/',
-  navigate: () => {},
-})
-
-// Router provider component
+// Interface definitions for props
 interface RouterProviderProps {
   children: React.ReactNode
 }
 
-export function RouterProvider({ children }: RouterProviderProps) {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname || '/')
-
-  // Update path when browser history changes
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname)
-    }
-
-    window.addEventListener('popstate', handleLocationChange)
-    return () => window.removeEventListener('popstate', handleLocationChange)
-  }, [])
-
-  // Function to navigate to a new route
-  const navigate = (to: string) => {
-    window.history.pushState({}, '', to)
-    setCurrentPath(to)
-  }
-
-  return (
-    <RouterContext.Provider value={{ currentPath, navigate }}>{children}</RouterContext.Provider>
-  )
-}
-
-// Hook to access router context
-// eslint-disable-next-line react-refresh/only-export-components
-export function useRouter() {
-  return useContext(RouterContext)
-}
-
-// Link component
-interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+interface LinkProps extends React.ComponentPropsWithoutRef<typeof RouterLink> {
   to: string
   children: React.ReactNode
 }
 
-export function Link({ to, children, ...props }: LinkProps) {
-  const { navigate } = useRouter()
+// Re-export components with similar API for backward compatibility
+export function RouterProvider({ children }: RouterProviderProps) {
+  // Determine the base URL - for GitHub Pages deployment
+  const baseUrl = import.meta.env.BASE_URL || '/'
 
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault()
-    navigate(to)
+  return <BrowserRouter basename={baseUrl}>{children}</BrowserRouter>
+}
+
+// Hook for accessing router functionality
+export function useRouter() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  return {
+    currentPath: location.pathname,
+    navigate: (to: string) => navigate(to),
   }
+}
 
+// Link component with similar API
+export function Link({ to, children, ...props }: LinkProps) {
   return (
-    <a href={to} onClick={handleClick} {...props}>
+    <RouterLink to={to} {...props}>
       {children}
-    </a>
+    </RouterLink>
   )
 }
 
-// Route component
-interface RouteProps {
-  path: string
-  element: React.ReactNode
-}
+// Route component with similar API - directly export React Router's Route
+export const Route = RouterRoute
 
-export function Route({ path, element }: RouteProps) {
-  const { currentPath } = useRouter()
-  return currentPath === path ? <>{element}</> : null
-}
-
-// Routes component
-interface RoutesProps {
-  children: React.ReactNode
-}
-
-export function Routes({ children }: RoutesProps) {
-  return <>{children}</>
-}
+// Routes component - directly export React Router's Routes
+export const Routes = RouterRoutes

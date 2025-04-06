@@ -20,8 +20,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       // Code quality rules (not formatting)
+      // 'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       // 'no-console': ['warn'],
       'prefer-const': ['error'],
       'object-shorthand': ['error', 'always'],
