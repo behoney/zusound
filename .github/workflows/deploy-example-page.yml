@@ -3,9 +3,8 @@ name: Deploy Examples to GitHub Pages
 on:
   # Runs on pushes targeting the default branch
   push:
-  # dev branch is used until v1.0.0 is released
+    # dev branch is used until v1.0.0 is released
     branches: ['main', 'dev']
-
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -46,8 +45,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
-          # Base path is set in vite.examples.config.ts
-          
+
       - name: Debug directory content
         run: ls -la ./dist
 
