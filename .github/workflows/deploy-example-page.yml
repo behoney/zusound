@@ -46,8 +46,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
-          # Make sure the base path is correctly set for GitHub Pages
-          # This should match the base path in your vite config
+          # Base path is set in vite.examples.config.ts
           
       - name: Debug directory content
         run: ls -la ./dist
@@ -62,6 +61,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          # Ensure the correct base path is used
-          path: './dist'
