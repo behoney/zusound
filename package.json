@@ -1,6 +1,6 @@
 {
   "name": "zusound",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Sound feedback middleware for Zustand state management",
   "type": "module",
   "main": "./dist/zusound.umd.js",
@@ -70,6 +70,7 @@
     "jsdom": "^26.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^7.5.0",
     "rimraf": "^6.0.1",
     "tsc-alias": "^1.8.13",
     "typescript": "~5.7.2",

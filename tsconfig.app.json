@@ -26,13 +26,6 @@
     "noUncheckedSideEffectImports": true,
     "noImplicitAny": false
   },
-  "include": [
-    "packages/**/*.ts",
-    "packages/**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules",
-    "examples/**/*",
-    "**/*.test.ts"
-  ]
+  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "exclude": ["node_modules", "examples/**/*", "**/*.test.ts"]
 }

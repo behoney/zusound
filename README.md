@@ -1,6 +1,6 @@
 # ✨ zusound: Hear Your State Changes! ✨
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
 
 Ever wondered what your application's state _sounds_ like? zusound is a lightweight Zustand middleware that transforms state changes into an auditory experience. Get real-time, sonic feedback on how your application behaves, making debugging more intuitive and maybe even... fun?
 
@@ -91,10 +91,10 @@ const useStore = create(
       decrement: () => set(state => ({ count: state.count - 1 })),
     }),
     {
-      enabled: true,                // Enable/disable sounds (default: true in dev, auto-disabled in production)
-      logDiffs: false,              // Log state diffs to console (default: false)
-      allowInProduction: false,     // Allow zusound to work in production (default: false)
-      name: 'CounterStore',         // Name for the store (optional)
+      enabled: true, // Enable/disable sounds (default: true in dev, auto-disabled in production)
+      logDiffs: false, // Log state diffs to console (default: false)
+      allowInProduction: false, // Allow zusound to work in production (default: false)
+      name: 'CounterStore', // Name for the store (optional)
     }
   )
 )
@@ -105,6 +105,7 @@ const useStore = create(
 By default, zusound is disabled in production environments to avoid unnecessary overhead in your released application. This behavior ensures that your development tools don't affect end-user experience.
 
 The middleware automatically detects production environments by checking:
+
 - `process.env.NODE_ENV === 'production'` (Node.js / React)
 - `import.meta.env.PROD === true` (Vite)
 
@@ -115,7 +116,7 @@ const useStore = create(
   zusound(
     // Your store initializer...
     {
-      allowInProduction: true  // Force zusound to work even in production
+      allowInProduction: true, // Force zusound to work even in production
     }
   )
 )

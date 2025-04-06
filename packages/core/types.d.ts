@@ -33,6 +33,7 @@ declare module 'zustand/vanilla' {
 export type DiffResult = ReturnType<typeof calculateDiff> // Or potentially `unknown` or a specific interface
 
 /** Data structure containing information about a single state transition. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface TraceData<T = unknown> {
   /** The calculated difference between prevState and nextState. */
   diff: DiffResult

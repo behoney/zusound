@@ -7,7 +7,6 @@ import { RouterProvider, Routes, Route } from './router'
 import { Header } from './Header'
 
 // Create App container component with the header
-// eslint-disable-next-line react-refresh/only-export-components
 function App() {
   return (
     <RouterProvider>

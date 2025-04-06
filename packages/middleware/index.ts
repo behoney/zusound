@@ -13,45 +13,28 @@
 import { trace } from '../core/index'
 import type { TraceOptions } from '../core/types'
 import type { StateCreator } from 'zustand/vanilla'
+import { isProduction } from './utils'
 
 // Augment ImportMeta to support Vite's environment variables
 declare global {
-    interface ImportMeta {
-        env?: {
-            PROD?: boolean;
-            DEV?: boolean;
-        };
+  interface ImportMeta {
+    env?: {
+      PROD?: boolean
+      DEV?: boolean
     }
-}
-
-/**
- * Detect if running in production environment
- * This tries multiple common patterns for detecting production
- */
-const isProduction = (): boolean => {
-    // Check for common environment variables
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') {
-        return true
-    }
-
-    // Check for Vite's import.meta.env (will be replaced at build time)
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD === true) {
-        return true
-    }
-
-    return false
+  }
 }
 
 /**
  * Interface for zusound middleware options
  */
 interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'> {
-    /** Enable/disable sound feedback (default: true in dev, false in prod) */
-    enabled?: boolean
-    /** Log state diffs to console (default: false) */
-    logDiffs?: boolean
-    /** Allow in production (default: false) */
-    allowInProduction?: boolean
+  /** Enable/disable sound feedback (default: true in dev, false in prod) */
+  enabled?: boolean
+  /** Log state diffs to console (default: false) */
+  logDiffs?: boolean
+  /** Allow in production (default: false) */
+  allowInProduction?: boolean
 }
 
 /**
@@ -59,41 +42,40 @@ interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'
  * Extends the core trace middleware with additional user-friendly options
  */
 export const zusound = <T extends object>(
-    initializer: StateCreator<T>,
-    options: zusoundOptions<T> = {}
+  initializer: StateCreator<T>,
+  options: zusoundOptions<T> = {}
 ) => {
-    const {
-        enabled = true,
-        logDiffs = false,
-        allowInProduction = false,
-        ...restOptions
-    } = options
+  const { enabled = true, logDiffs = false, allowInProduction = false, ...restOptions } = options
 
-    // Check if we should run in production
-    const inProduction = isProduction()
-    const disableInProduction = inProduction && !allowInProduction
+  // Check if we should run in production
+  const inProduction = isProduction()
+  const disableInProduction = inProduction && !allowInProduction
 
-    // If explicitly disabled or we're in production and not allowing it
-    if (enabled === false || disableInProduction) {
-        // In production, just return the original initializer without middleware
-        return initializer
+  // If explicitly disabled or we're in production and not allowing it
+  if (enabled === false || disableInProduction) {
+    // In production, just return the original initializer without middleware
+    return initializer
+  }
+
+  // Create onTrace handler that logs diffs if requested
+  const traceOptions: TraceOptions<T> = {
+    ...restOptions,
+  }
+
+  // Add diff logging if requested
+  if (logDiffs) {
+    const originalOnTrace = traceOptions.onTrace
+
+    // TODO:: we need to find a better way to do this
+    window['__zusound_logger__'] = []
+
+    traceOptions.onTrace = traceData => {
+      window['__zusound_logger__'].push(traceData)
+      if (originalOnTrace) {
+        originalOnTrace(traceData)
+      }
     }
+  }
 
-    // Create onTrace handler that logs diffs if requested
-    const traceOptions: TraceOptions<T> = {
-        ...restOptions,
-    }
-
-    // Add diff logging if requested
-    if (logDiffs) {
-        const originalOnTrace = traceOptions.onTrace
-        traceOptions.onTrace = (traceData) => {
-            console.log('[zusound] State changes:', traceData.diff)
-            if (originalOnTrace) {
-                originalOnTrace(traceData)
-            }
-        }
-    }
-
-    return trace(initializer, traceOptions)
+  return trace(initializer, traceOptions)
 }

@@ -91,6 +91,7 @@ export function playSonicChunk(chunk: SonicChunk): void {
 
     // If audio context is suspended (e.g., browser autoplay policy), try to resume it
     if (ctx.state === 'suspended') {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ctx.resume().catch(err => {
         // console.warn('Could not resume audio context:', err.message);
       })
