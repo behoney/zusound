@@ -45,7 +45,9 @@ const useAnotherStore = create<AnotherState>(
         ...state,
         anotherText: str,
       })),
-  }))
+  }), {
+    logDiffs: true,
+  })
 )
 
 function BasicUsage() {

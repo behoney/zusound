@@ -13,6 +13,7 @@
 import { trace } from '../core/index'
 import type { TraceOptions } from '../core/types'
 import type { StateCreator } from 'zustand/vanilla'
+import { isProduction } from './utils'
 
 // Augment ImportMeta to support Vite's environment variables
 declare global {
@@ -22,24 +23,6 @@ declare global {
       DEV?: boolean
     }
   }
-}
-
-/**
- * Detect if running in production environment
- * This tries multiple common patterns for detecting production
- */
-const isProduction = (): boolean => {
-  // Check for common environment variables
-  if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') {
-    return true
-  }
-
-  // Check for Vite's import.meta.env (will be replaced at build time)
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD === true) {
-    return true
-  }
-
-  return false
 }
 
 /**
@@ -82,8 +65,12 @@ export const zusound = <T extends object>(
   // Add diff logging if requested
   if (logDiffs) {
     const originalOnTrace = traceOptions.onTrace
+
+    // TODO:: we need to find a better way to do this
+    window['__zusound_logger__'] = []
+
     traceOptions.onTrace = traceData => {
-      console.log('[zusound] State changes:', traceData.diff)
+      window['__zusound_logger__'].push(traceData)
       if (originalOnTrace) {
         originalOnTrace(traceData)
       }
