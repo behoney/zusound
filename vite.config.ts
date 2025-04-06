@@ -8,7 +8,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'packages/index.ts'),
       name: 'zusound',
-      fileName: (format) => `zusound.${format}.js`,
+      fileName: format => `zusound.${format}.js`,
       formats: ['es', 'umd'],
     },
     rollupOptions: {

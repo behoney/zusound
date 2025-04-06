@@ -29,8 +29,8 @@ export default defineConfig({
         } else {
           console.error('Could not find examples/index.html')
         }
-      }
-    }
+      },
+    },
   ],
 
   // Configure for GitHub Pages
@@ -47,8 +47,8 @@ export default defineConfig({
         // Ensure index.html goes to root instead of examples subdirectory
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
-      }
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
     },
   },
 
