@@ -10,10 +10,10 @@
  * with sensible defaults and a streamlined API surface.
  */
 
-import { trace } from '../core/index'
-import type { TraceOptions } from '../core/types'
-import type { StateCreator } from 'zustand/vanilla'
+import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 import { isProduction } from './utils'
+import type { TraceOptions, ZusoundMutator } from '../core'
+import { trace } from '../core'
 
 // Augment ImportMeta to support Vite's environment variables
 declare global {
@@ -41,11 +41,14 @@ interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'
  * zusound middleware for Zustand
  * Extends the core trace middleware with additional user-friendly options
  */
-export const zusound = <T extends object>(
-  // TODO(#1):: initializer type should be revised. it doesn't support the immer now.
-  initializer: StateCreator<T>,
+export const zusound = <
+  T extends object,
+  Mps extends [StoreMutatorIdentifier, unknown][] = [],
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+>(
+  initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
   options: zusoundOptions<T> = {}
-) => {
+): StateCreator<T, Mps, [ZusoundMutator, ...Mcs]> => {
   const { enabled = true, logDiffs = false, allowInProduction = false, ...restOptions } = options
 
   // Check if we should run in production
@@ -54,8 +57,9 @@ export const zusound = <T extends object>(
 
   // If explicitly disabled or we're in production and not allowing it
   if (enabled === false || disableInProduction) {
-    // In production, just return the original initializer without middleware
-    return initializer
+    // Return the initializer without applying the middleware
+    // Need to cast because the return type expects the ZusoundMutator
+    return initializer as unknown as StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>
   }
 
   // Create onTrace handler that logs diffs if requested
@@ -78,5 +82,11 @@ export const zusound = <T extends object>(
     }
   }
 
-  return trace(initializer, traceOptions)
+  // Apply the trace middleware with proper type handling
+  // We need to cast the result to match the expected return type signature
+  return trace(initializer as StateCreator<T, [], []>) as StateCreator<
+    T,
+    Mps,
+    [ZusoundMutator, ...Mcs]
+  >
 }

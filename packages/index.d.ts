@@ -1,4 +1,4 @@
-import type { StateCreator } from 'zustand'
+import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 
 /** Diff result representing changes between states */
 interface DiffResult {
@@ -8,11 +8,21 @@ interface DiffResult {
 }
 
 /**
+ * Unique identifier for the zusound middleware's mutation type within Zustand.
+ */
+type ZusoundMutator = ['zusound', unknown]
+
+/**
  * zusound middleware for Zustand
  * Provides sound feedback on state changes
  */
-export declare function zusound<T extends object>(
-  initializer: StateCreator<T>,
+export declare function zusound<
+  T extends object,
+  Mps extends [StoreMutatorIdentifier, unknown][] = [],
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+>(
+  // @ts-expect-error - Internal Zustand constraint expects 'never' identifier here
+  initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
   options?: {
     /** Enable/disable sound feedback (default: true in dev, false in prod) */
     enabled?: boolean
@@ -35,7 +45,5 @@ export declare function zusound<T extends object>(
      */
     diffFn?: (prevState: T, nextState: T) => DiffResult
   }
-): StateCreator<T>
-
-// Internal types used by Zustand
-type StoreMutatorIdentifier = symbol | string
+  // @ts-expect-error - Internal Zustand constraint expects 'never' identifier here
+): StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>

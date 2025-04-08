@@ -18,6 +18,7 @@ interface AnotherState {
 
 // Create stores with proper typing
 const useCountStore = create<CountState>(
+  // TODO:: fix type issue with zusound
   zusound<CountState>(set => ({
     count: 0,
     increment: () => set(state => ({ count: state.count + 1 })),
@@ -25,29 +26,32 @@ const useCountStore = create<CountState>(
 )
 
 const useAnotherStore = create<AnotherState>(
-  zusound(set => ({
-    anotherText: 'a',
-    anotherCount: 0,
-    anotherRandom: {},
-    anotherBoolean: false,
-    updateAnother: () =>
-      set(state => ({
-        anotherText: `${state.anotherText}a`,
-        anotherCount: state.anotherCount + 1,
-        anotherRandom: {
-          ...state.anotherRandom,
-          [Math.random()]: Math.random(),
-        },
-        anotherBoolean: !state.anotherBoolean,
-      })),
-    updateTexts: (str: string) =>
-      set(state => ({
-        ...state,
-        anotherText: str,
-      })),
-  }), {
-    logDiffs: true,
-  })
+  zusound(
+    set => ({
+      anotherText: 'a',
+      anotherCount: 0,
+      anotherRandom: {},
+      anotherBoolean: false,
+      updateAnother: () =>
+        set(state => ({
+          anotherText: `${state.anotherText}a`,
+          anotherCount: state.anotherCount + 1,
+          anotherRandom: {
+            ...state.anotherRandom,
+            [Math.random()]: Math.random(),
+          },
+          anotherBoolean: !state.anotherBoolean,
+        })),
+      updateTexts: (str: string) =>
+        set(state => ({
+          ...state,
+          anotherText: str,
+        })),
+    }),
+    {
+      logDiffs: true,
+    }
+  )
 )
 
 function BasicUsage() {

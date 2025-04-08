@@ -6,7 +6,7 @@ import { calculateDiff } from '../diff'
  * Unique identifier for the trace middleware's mutation type within Zustand.
  * Required for Zustand's middleware pattern.
  */
-type TraceMutator = ['zustand/trace', never]
+export type ZusoundMutator = ['zusound', never]
 
 /** Utility type to modify properties of an existing type. */
 type Write<T, U> = Omit<T, keyof U> & U
@@ -16,7 +16,7 @@ type Write<T, U> = Omit<T, keyof U> & U
  * In this basic version, it doesn't alter the public signature significantly,
  * but defining it maintains the pattern for potential future extensions.
  */
-type WithTrace<S> = S
+type WithZusound<S> = S
 
 /**
  * Augments the Zustand vanilla module definition.
@@ -25,7 +25,7 @@ type WithTrace<S> = S
 declare module 'zustand/vanilla' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface StoreMutators<S, A> {
-    'zustand/trace': WithTrace<S>
+    zusound: WithZusound<S>
   }
 }
 
@@ -67,9 +67,9 @@ export type Trace = <
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
 >(
-  initializer: StateCreator<T, [...Mps, TraceMutator], Mcs>,
+  initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
   options?: TraceOptions<T>
-) => StateCreator<T, Mps, [TraceMutator, ...Mcs]>
+) => StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>
 
 /** Internal type signature for the trace middleware's implementation. */
 export type TraceImpl = <T>(
