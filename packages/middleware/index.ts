@@ -42,6 +42,7 @@ interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'
  * Extends the core trace middleware with additional user-friendly options
  */
 export const zusound = <T extends object>(
+  // TODO(#1):: initializer type should be revised. it doesn't support the immer now.
   initializer: StateCreator<T>,
   options: zusoundOptions<T> = {}
 ) => {
@@ -66,7 +67,7 @@ export const zusound = <T extends object>(
   if (logDiffs) {
     const originalOnTrace = traceOptions.onTrace
 
-    // TODO:: we need to find a better way to do this
+    // TODO(#10):: we need to find a better way to do this
     window['__zusound_logger__'] = []
 
     traceOptions.onTrace = traceData => {

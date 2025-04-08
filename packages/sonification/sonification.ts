@@ -85,7 +85,7 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
  * @throws Error if Web Audio API is not supported or audio cannot be played
  */
 export function playSonicChunk(chunk: SonicChunk): void {
-  // TODO:: long function, refactor this into smaller functions
+  // TODO(#11):: long function, refactor this into smaller functions
   try {
     const ctx = getAudioContext()
 
