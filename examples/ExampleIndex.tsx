@@ -23,6 +23,13 @@ const exampleLinks: ExampleLink[] = [
     description: 'A more complex example with a todo application and multiple state changes',
     path: '/todo',
     image: '/screenshots/todo-app.png',
+  },  
+  {
+    id: 'middlewares',
+    title: 'Middlewares',
+    description: 'Examples of using zusound with different Zustand middlewares',
+    path: '/middlewares',
+    image: '/screenshots/middlewares.png',
   },
 ]
 
