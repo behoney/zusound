@@ -10,12 +10,12 @@ import { sonifyChanges } from '../sonification/sonification'
 export const traceImpl: TraceImpl =
   <T>(initializer: StateCreator<T, [], []>, options: TraceOptions<T> = {}) =>
   (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => {
-    // TODO:: refactor this into smaller functions, write test code
+    // TODO(#8):: refactor this into smaller functions, write test code
     // Default handler provides detailed console logging for each trace.
     const {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       onTrace = (traceData: TraceData<T>) => {
-        // TODO:: decide what to do with the trace data by default.
+        // TODO(#9):: decide what to do with the trace data by default.
       },
       diffFn = calculateDiff as (prevState: T, nextState: T) => DiffResult, // Use the default diff function if none is provided.
     } = options

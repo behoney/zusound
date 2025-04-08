@@ -2,7 +2,8 @@
  * Utility functions for the sonification module
  */
 
-// TODO:: This should be a singleton, when several instances are created, it will cause multiple audio contexts.
+// TODO(#12):: This should be a singleton, when several instances are created, it will cause multiple audio contexts.
+
 /**
  * AudioContext singleton to manage audio resources
  */
