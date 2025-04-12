@@ -79,9 +79,9 @@ const createTracedSetState = <T>(
 /**
  * The internal implementation of the trace middleware.
  * This function wraps the original Zustand store creator and intercepts setState calls.
- * 
+ *
  * Note: The middleware will trigger even when state reference is different but values are identical.
- * This is important because even though there's no actual difference in values, a React component 
+ * This is important because even though there's no actual difference in values, a React component
  * might re-render due to the reference change, so we want to capture this in the trace.
  */
 export const traceImpl: TraceImpl =
