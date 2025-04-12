@@ -4,6 +4,37 @@ import { diffToSonic, sonifyChanges } from '../sonification'
 import { AUDIO_CONFIG } from '../constants'
 import * as sonificationModule from '../sonification'
 
+// --- Global Mocks ---
+// Mock AudioContext for jsdom environment
+if (typeof window !== 'undefined') {
+  window.AudioContext = vi.fn().mockImplementation(() => ({
+    createOscillator: vi.fn(() => ({
+      type: '',
+      frequency: { setValueAtTime: vi.fn() },
+      detune: { setValueAtTime: vi.fn() },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      onended: vi.fn(),
+    })),
+    createGain: vi.fn(() => ({
+      gain: {
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+      },
+      connect: vi.fn(),
+      disconnect: vi.fn(), // Added disconnect mock
+    })),
+    destination: {},
+    currentTime: 0,
+    state: 'running',
+    resume: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined), // Added close mock
+  }))
+}
+// --- End Global Mocks ---
+
 // Mock playSonicChunk
 vi.spyOn(sonificationModule, 'playSonicChunk').mockImplementation(() => {})
 
@@ -86,6 +117,7 @@ describe('sonification', () => {
       // This should not throw
       sonifyChanges({ test: 1 }, 100)
 
+      // TODO:: Fix this test
       expect(consoleSpy).toHaveBeenCalledWith('Sonification failed:', expect.any(String))
       expect(playSonicChunkSpy).not.toHaveBeenCalled()
     })

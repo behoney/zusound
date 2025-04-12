@@ -167,9 +167,20 @@ export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
 
     // Use staggered playback for clearer auditory perception
     chunks.forEach((chunk, index) => {
-      setTimeout(() => playSonicChunk(chunk), index * AUDIO_CONFIG.STAGGER_DELAY_MS)
+      setTimeout(() => {
+        try {
+          playSonicChunk(chunk)
+        } catch (err) {
+          // Catch errors specifically from the asynchronous playSonicChunk call
+          console.error(
+            `Sonification failed during playback for chunk ${chunk.id}:`,
+            err instanceof Error ? err.message : String(err)
+          )
+        }
+      }, index * AUDIO_CONFIG.STAGGER_DELAY_MS)
     })
   } catch (err: unknown) {
+    // Catch synchronous errors (e.g., from diffToSonic)
     console.error('Sonification failed:', err instanceof Error ? err.message : String(err))
   }
 }
