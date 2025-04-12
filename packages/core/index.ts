@@ -12,3 +12,4 @@
  */
 
 export { traceImpl as trace } from './traceMiddleware'
+export type { ZusoundMutator, TraceOptions } from './types.d.ts'

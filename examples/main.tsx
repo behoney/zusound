@@ -5,6 +5,7 @@ import BasicUsage from './basic-usage/BasicUsage'
 import { ExampleIndex } from './ExampleIndex'
 import { RouterProvider, Routes, Route } from './router'
 import { Header } from './Header'
+import Middlewares from './middlewares/Middlewares'
 
 // Create App container component with the header
 function App() {
@@ -24,6 +25,7 @@ function App() {
             <Route path="/" element={<ExampleIndex />} />
             <Route path="/basic" element={<BasicUsage />} />
             <Route path="/todo" element={<TodoApp />} />
+            <Route path="/middlewares" element={<Middlewares />} />
           </Routes>
         </main>
       </div>
