@@ -11,5 +11,13 @@
  * from their respective packages.
  */
 
-export { traceImpl as trace } from './traceMiddleware'
-export type { ZusoundMutator, TraceOptions } from './types.d.ts'
+// Import the implementation function
+import { traceImpl as traceMiddlewareImpl } from './traceMiddleware'
+// Import the public type definition and other necessary types
+import type { Trace, ZusoundMutator, TraceOptions, DiffResult } from './types.d.ts'
+
+// Export the implementation but assert its type to the public Trace signature
+export const trace = traceMiddlewareImpl as Trace
+
+// Re-export types
+export type { ZusoundMutator, TraceOptions, DiffResult, TraceData } from './types.d.ts'
