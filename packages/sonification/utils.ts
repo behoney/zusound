@@ -2,29 +2,67 @@
  * Utility functions for the sonification module
  */
 
-// TODO(#12):: This should be a singleton, when several instances are created, it will cause multiple audio contexts.
-
 /**
- * AudioContext singleton to manage audio resources
+ * Class to manage the lifecycle of a single AudioContext instance.
  */
-let audioContext: AudioContext | null = null
+export class AudioContextManager {
+  private static instance: AudioContextManager | null = null
+  private audioContext: AudioContext | null = null
 
-/**
- * Initialize or return the existing AudioContext
- * @returns AudioContext instance
- * @throws Error if Web Audio API is not supported
- */
-export const getAudioContext = (): AudioContext => {
-  if (!audioContext) {
-    try {
-      audioContext = new AudioContext()
-    } catch (err: unknown) {
-      throw new Error(
-        `Web Audio API not supported in this browser: ${err instanceof Error ? err.message : String(err)}`
-      )
+  private constructor() {
+    // Private constructor to enforce singleton pattern
+  }
+
+  /**
+   * Get the singleton instance of AudioContextManager.
+   * @returns The singleton instance of AudioContextManager.
+   */
+  public static getInstance(): AudioContextManager {
+    if (AudioContextManager.instance === null) {
+      AudioContextManager.instance = new AudioContextManager()
+    }
+    return AudioContextManager.instance
+  }
+
+  /**
+   * Get or initialize the AudioContext.
+   * @returns The managed AudioContext instance.
+   * @throws Error if Web Audio API is not supported or if context creation fails.
+   */
+  public getContext(): AudioContext {
+    if (this.audioContext === null || this.audioContext.state === 'closed') {
+      try {
+        this.audioContext = new AudioContext()
+      } catch (err: unknown) {
+        this.audioContext = null
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('Failed to create AudioContext:', message)
+        throw new Error(`Web Audio API is not supported or could not be initialized: ${message}`)
+      }
+    }
+    return this.audioContext
+  }
+
+  /**
+   * Clean up audio resources by closing the managed AudioContext.
+   * @returns Promise that resolves when the context is closed.
+   */
+  public async cleanup(): Promise<void> {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      try {
+        await this.audioContext.close()
+        this.audioContext = null
+      } catch (err: unknown) {
+        console.warn(
+          'Error closing audio context:',
+          err instanceof Error ? err.message : String(err)
+        )
+        this.audioContext = null
+      }
+    } else {
+      this.audioContext = null
     }
   }
-  return audioContext
 }
 
 /**
@@ -42,17 +80,10 @@ export const simpleHash = (str: string): number => {
 }
 
 /**
- * Clean up audio resources - useful when the component using sonification unmounts
+ * Clean up audio resources by closing the singleton AudioContext.
+ * This should be called when the application or the part using sonification unmounts.
+ * @deprecated Use AudioContextManager.getInstance().cleanup() instead.
  */
 export const cleanupAudio = (): void => {
-  if (audioContext) {
-    audioContext
-      .close()
-      .then(() => {
-        audioContext = null
-      })
-      .catch(err => {
-        console.warn('Error closing audio context:', err.message)
-      })
-  }
+  AudioContextManager.getInstance().cleanup()
 }

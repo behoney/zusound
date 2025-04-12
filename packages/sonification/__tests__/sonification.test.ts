@@ -3,36 +3,47 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { diffToSonic, sonifyChanges } from '../sonification'
 import { AUDIO_CONFIG } from '../constants'
 import * as sonificationModule from '../sonification'
+import { AudioContextManager } from '../utils'
 
 // --- Global Mocks ---
-// Mock AudioContext for jsdom environment
-if (typeof window !== 'undefined') {
-  window.AudioContext = vi.fn().mockImplementation(() => ({
-    createOscillator: vi.fn(() => ({
-      type: '',
-      frequency: { setValueAtTime: vi.fn() },
-      detune: { setValueAtTime: vi.fn() },
-      connect: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-      onended: vi.fn(),
+// Mock AudioContextManager for jsdom environment
+vi.mock('../utils', async importOriginal => {
+  const original = await importOriginal<typeof import('../utils')>()
+  const MockedAudioContextManager = vi.fn().mockImplementation(() => ({
+    getContext: vi.fn(() => ({
+      createOscillator: vi.fn(() => ({
+        type: '',
+        frequency: { setValueAtTime: vi.fn() },
+        detune: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        onended: vi.fn(),
+        disconnect: vi.fn(),
+      })),
+      createGain: vi.fn(() => ({
+        gain: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      })),
+      destination: {},
+      currentTime: 0,
+      state: 'running',
+      resume: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
     })),
-    createGain: vi.fn(() => ({
-      gain: {
-        setValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-        linearRampToValueAtTime: vi.fn(),
-      },
-      connect: vi.fn(),
-      disconnect: vi.fn(), // Added disconnect mock
-    })),
-    destination: {},
-    currentTime: 0,
-    state: 'running',
-    resume: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined), // Added close mock
+    cleanup: vi.fn().mockResolvedValue(undefined),
   }))
-}
+  return {
+    ...original,
+    AudioContextManager: MockedAudioContextManager,
+    getInstance: vi.fn(() => new MockedAudioContextManager()),
+  }
+})
 // --- End Global Mocks ---
 
 // Mock playSonicChunk
