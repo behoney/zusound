@@ -47,7 +47,7 @@ interface ZusoundOptions<T> extends TraceOptions<T> {
 export const zusound = <
   T extends object,
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = []
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
 >(
   // Initializer type now includes the middleware generics
   initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
@@ -71,7 +71,7 @@ export const zusound = <
     // If disabled, remove the ZusoundMutator type from Mps and return
     // We need to cast because the original initializer expects ZusoundMutator
     // Assert the type to match the function's declared return signature
-    return initializer as unknown as StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>;
+    return initializer as unknown as StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>
   }
 
   // --- Prepare TraceOptions ---
@@ -89,7 +89,7 @@ export const zusound = <
 
     traceOptions.onTrace = (traceData: TraceData<T>) => {
       if (typeof window !== 'undefined' && window['__zusound_logger__']) {
-        window['__zusound_logger__'].push(traceData);
+        window['__zusound_logger__'].push(traceData)
       }
       // Call the user's original onTrace if it exists
       if (userOnTrace) {
@@ -102,7 +102,7 @@ export const zusound = <
     }
   } else if (userOnTrace) {
     // If only userOnTrace is provided (no logDiffs)
-    traceOptions.onTrace = userOnTrace;
+    traceOptions.onTrace = userOnTrace
   }
 
   // Call the core trace function with the initializer and options

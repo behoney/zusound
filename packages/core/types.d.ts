@@ -1,6 +1,4 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
-// Import calculateDiff only for its return type. Consider making DiffResult generic if this feels odd.
-import { calculateDiff } from '../diff'
 
 /**
  * Unique identifier for the trace middleware's mutation type within Zustand.
