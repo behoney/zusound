@@ -1,6 +1,6 @@
 import { SonicChunk } from './types'
 import { AUDIO_CONFIG } from './constants'
-import { getAudioContext, simpleHash, cleanupAudio } from './utils'
+import { AudioContextManager, simpleHash } from './utils'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -87,14 +87,12 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
 export function playSonicChunk(chunk: SonicChunk): void {
   // TODO(#11):: long function, refactor this into smaller functions
   try {
-    const ctx = getAudioContext()
+    const ctx = AudioContextManager.getInstance().getContext()
 
     // If audio context is suspended (e.g., browser autoplay policy), try to resume it
     if (ctx.state === 'suspended') {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ctx.resume().catch(err => {
-        // console.warn('Could not resume audio context:', err.message);
-      })
+      ctx.resume().catch(err => {})
     }
 
     const now = ctx.currentTime
@@ -143,10 +141,8 @@ export function playSonicChunk(chunk: SonicChunk): void {
     oscillator.stop(now + duration)
   } catch (err) {
     if (err instanceof Error) {
-      // console.error('Failed to play audio:', err.message);
       throw new Error(`Failed to play audio: ${err.message}`)
     } else {
-      // console.error('Failed to play audio:', err);
       throw new Error('Failed to play audio')
     }
   }
@@ -184,6 +180,3 @@ export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
     console.error('Sonification failed:', err instanceof Error ? err.message : String(err))
   }
 }
-
-// Re-export for backwards compatibility
-export { cleanupAudio }
