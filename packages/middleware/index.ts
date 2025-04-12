@@ -11,7 +11,7 @@
  */
 
 import { trace } from '../core/index'
-import type { TraceOptions, ZusoundMutator, DiffResult, TraceData } from '../core/types' // Import necessary types
+import type { TraceOptions, DiffResult, TraceData } from '../core/types' // Import necessary types
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla' // Import Zustand types
 import { isProduction } from './utils'
 
@@ -40,20 +40,31 @@ interface ZusoundOptions<T> extends TraceOptions<T> {
 }
 
 /**
- * zusound middleware for Zustand
- * Extends the core trace middleware with additional user-friendly options
- * and correctly handles middleware composition.
+ * Type definition for the zusound middleware function.
+ * This type captures the middleware's generic parameters and return type.
  */
-export const zusound = <
+export type Zusound = <
   T extends object,
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
 >(
-  // Initializer type now includes the middleware generics
-  initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
+  initializer: StateCreator<T, [...Mps] | [...Mps], Mcs>,
+  options?: ZusoundOptions<T>
+) => StateCreator<T, Mps, [...Mcs]>
+
+/**
+ * zusound middleware for Zustand
+ * Extends the core trace middleware with additional user-friendly options
+ * and correctly handles middleware composition.
+ */
+export const zusound: Zusound = <
+  T extends object,
+  Mps extends [StoreMutatorIdentifier, unknown][] = [],
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+>(
+  initializer: StateCreator<T, [...Mps], Mcs>,
   options: ZusoundOptions<T> = {}
-  // Return type reflects the application of this middleware
-): StateCreator<T, Mps, [ZusoundMutator, ...Mcs]> => {
+) => {
   const {
     enabled = !isProduction(), // Default to enabled in dev, disabled in prod
     logDiffs = false,
@@ -68,10 +79,10 @@ export const zusound = <
   const disable = enabled === false || (inProduction && !allowInProduction)
 
   if (disable) {
-    // If disabled, remove the ZusoundMutator type from Mps and return
-    // We need to cast because the original initializer expects ZusoundMutator
+    // If disabled, remove the  type from Mps and return
+    // We need to cast because the original initializer expects
     // Assert the type to match the function's declared return signature
-    return initializer as unknown as StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>
+    return initializer as unknown as StateCreator<T, Mps, [...Mcs]>
   }
 
   // --- Prepare TraceOptions ---

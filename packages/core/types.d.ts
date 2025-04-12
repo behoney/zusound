@@ -1,11 +1,5 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 
-/**
- * Unique identifier for the trace middleware's mutation type within Zustand.
- * Required for Zustand's middleware pattern.
- */
-export type ZusoundMutator = ['zusound', never]
-
 /** Utility type to modify properties of an existing type. */
 type Write<T, U> = Omit<T, keyof U> & U
 
@@ -67,10 +61,10 @@ export type Trace = <
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
 >(
   // The initializer receives ZusoundMutator in its Mps list
-  initializer: StateCreator<T, [...Mps, ZusoundMutator], Mcs>,
+  initializer: StateCreator<T, [...Mps], Mcs>,
   options?: TraceOptions<T>
   // The returned creator has ZusoundMutator added to its Mcs list
-) => StateCreator<T, Mps, [ZusoundMutator, ...Mcs]>
+) => StateCreator<T, Mps, [...Mcs]>
 
 /** Internal type signature for the trace middleware's implementation. */
 export type TraceImpl = <T>(
