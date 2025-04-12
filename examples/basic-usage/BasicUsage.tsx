@@ -1,12 +1,6 @@
 import { create } from 'zustand'
 import { zusound } from '../../packages'
 
-// Define types for our store state and actions
-interface CountState {
-  count: number
-  increment: () => void
-}
-
 interface AnotherState {
   anotherText: string
   anotherCount: number
