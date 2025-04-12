@@ -1,7 +1,7 @@
 import type { StateCreator, StoreApi } from 'zustand/vanilla'
 import { calculateDiff } from '../diff'
 import type { TraceData, TraceOptions, TraceImpl, DiffResult } from './types'
-import { sonifyChanges } from '../sonification/sonification'
+import { sonifyChanges } from '../sonification'
 
 /**
  * Calculates the difference between states and timing information.
