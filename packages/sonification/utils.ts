@@ -78,12 +78,3 @@ export const simpleHash = (str: string): number => {
   }
   return Math.abs(hash)
 }
-
-/**
- * Clean up audio resources by closing the singleton AudioContext.
- * This should be called when the application or the part using sonification unmounts.
- * @deprecated Use AudioContextManager.getInstance().cleanup() instead.
- */
-export const cleanupAudio = (): void => {
-  AudioContextManager.getInstance().cleanup()
-}

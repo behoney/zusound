@@ -1,6 +1,6 @@
 import { SonicChunk } from './types'
 import { AUDIO_CONFIG } from './constants'
-import { AudioContextManager, simpleHash, cleanupAudio } from './utils'
+import { AudioContextManager, simpleHash } from './utils'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -180,6 +180,3 @@ export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
     console.error('Sonification failed:', err instanceof Error ? err.message : String(err))
   }
 }
-
-// Re-export for backwards compatibility
-export { cleanupAudio }
