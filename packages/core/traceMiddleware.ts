@@ -83,6 +83,7 @@ const createTracedSetState = <T>(
 export const traceImpl: TraceImpl =
   <T>(initializer: StateCreator<T, [], []>, options: TraceOptions<T> = {}) =>
   (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => {
+    // TODO:: Testcase failed. "should not trigger trace middleware when state reference is different but values are identical"
     const {
       // Default onTrace does nothing if not provided.
       onTrace = () => {},

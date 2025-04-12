@@ -25,7 +25,7 @@ export { sonifyChanges, playSonicChunk, diffToSonic } from './sonification'
 export type { SonicChunk } from './types'
 
 // Utilities
-export { cleanupAudio, getAudioContext } from './utils'
+export { cleanupAudio, AudioContextManager } from './utils'
 
 // Constants (for advanced configuration)
 export { AUDIO_CONFIG } from './constants'
