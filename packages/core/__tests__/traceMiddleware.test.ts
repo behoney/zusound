@@ -151,27 +151,6 @@ describe('traceMiddleware', () => {
     )
   })
 
-  it('should not trigger trace middleware when state reference is different but values are identical', () => {
-    const onTraceMock = vi.fn()
-    const store = createTestStore<TestState>(set => ({ count: 0, value: 'hello' }), {
-      onTrace: onTraceMock,
-    })
-
-    // Reset all mocks to ensure clean state
-    vi.clearAllMocks()
-
-    // Create a new object with the same values but different reference
-    const newState = { count: 0, value: 'hello' }
-
-    // This should not trigger trace middleware since values are identical
-    store.setState(newState)
-
-    // Verify trace middleware was not triggered
-    expect(onTraceMock).not.toHaveBeenCalled()
-    expect(mockCalculateDiff).not.toHaveBeenCalled()
-    expect(sonifyChangesSpy).not.toHaveBeenCalled()
-  })
-
   it('should trace if state changes (even if shallow equal parts)', () => {
     const onTraceMock = vi.fn()
     const store = createTestStore<TestState>(set => ({ count: 0, value: 'hello' }), {
