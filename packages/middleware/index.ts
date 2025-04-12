@@ -28,7 +28,7 @@ declare global {
 /**
  * Interface for zusound middleware options
  */
-interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'> {
+interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'> {
   /** Enable/disable sound feedback (default: true in dev, false in prod) */
   enabled?: boolean
   /** Log state diffs to console (default: false) */
@@ -44,7 +44,7 @@ interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'
 export const zusound = <T extends object>(
   // TODO(#1):: initializer type should be revised. it doesn't support the immer now.
   initializer: StateCreator<T>,
-  options: zusoundOptions<T> = {}
+  options: ZusoundOptions<T> = {}
 ) => {
   const { enabled = true, logDiffs = false, allowInProduction = false, ...restOptions } = options
 
