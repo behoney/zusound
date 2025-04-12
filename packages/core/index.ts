@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 /**
  * Core module for the Zustand state tracking middleware.
  *
@@ -11,4 +13,13 @@
  * from their respective packages.
  */
 
-export { traceImpl as trace } from './traceMiddleware'
+// Import the implementation function
+import { traceImpl as traceMiddlewareImpl } from './traceMiddleware'
+// Import the public type definition and other necessary types
+import type { Trace, TraceOptions, DiffResult } from './types.d.ts'
+
+// Export the implementation but assert its type to the public Trace signature
+export const trace = traceMiddlewareImpl as Trace
+
+// Re-export types
+export type { TraceOptions, DiffResult, TraceData } from './types.d.ts'

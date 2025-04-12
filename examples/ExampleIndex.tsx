@@ -24,6 +24,13 @@ const exampleLinks: ExampleLink[] = [
     path: '/todo',
     image: '/screenshots/todo-app.png',
   },
+  {
+    id: 'middlewares',
+    title: 'Middlewares',
+    description: 'Examples of using zusound with different Zustand middlewares',
+    path: '/middlewares',
+    image: '/screenshots/middlewares.png',
+  },
 ]
 
 function ExampleCard({ example }: { example: ExampleLink }) {

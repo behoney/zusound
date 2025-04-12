@@ -10,10 +10,8 @@
  * with sensible defaults and a streamlined API surface.
  */
 
-import { trace } from '../core/index'
-import type { TraceOptions } from '../core/types'
-import type { StateCreator } from 'zustand/vanilla'
-import { isProduction } from './utils'
+import type { Zusound, ZusoundOptions } from './types'
+import { zusound } from './zusound'
 
 // Augment ImportMeta to support Vite's environment variables
 declare global {
@@ -25,58 +23,5 @@ declare global {
   }
 }
 
-/**
- * Interface for zusound middleware options
- */
-interface zusoundOptions<T> extends Omit<TraceOptions<T>, 'enabled' | 'logDiffs'> {
-  /** Enable/disable sound feedback (default: true in dev, false in prod) */
-  enabled?: boolean
-  /** Log state diffs to console (default: false) */
-  logDiffs?: boolean
-  /** Allow in production (default: false) */
-  allowInProduction?: boolean
-}
-
-/**
- * zusound middleware for Zustand
- * Extends the core trace middleware with additional user-friendly options
- */
-export const zusound = <T extends object>(
-  // TODO(#1):: initializer type should be revised. it doesn't support the immer now.
-  initializer: StateCreator<T>,
-  options: zusoundOptions<T> = {}
-) => {
-  const { enabled = true, logDiffs = false, allowInProduction = false, ...restOptions } = options
-
-  // Check if we should run in production
-  const inProduction = isProduction()
-  const disableInProduction = inProduction && !allowInProduction
-
-  // If explicitly disabled or we're in production and not allowing it
-  if (enabled === false || disableInProduction) {
-    // In production, just return the original initializer without middleware
-    return initializer
-  }
-
-  // Create onTrace handler that logs diffs if requested
-  const traceOptions: TraceOptions<T> = {
-    ...restOptions,
-  }
-
-  // Add diff logging if requested
-  if (logDiffs) {
-    const originalOnTrace = traceOptions.onTrace
-
-    // TODO(#10):: we need to find a better way to do this
-    window['__zusound_logger__'] = []
-
-    traceOptions.onTrace = traceData => {
-      window['__zusound_logger__'].push(traceData)
-      if (originalOnTrace) {
-        originalOnTrace(traceData)
-      }
-    }
-  }
-
-  return trace(initializer, traceOptions)
-}
+export type { Zusound, ZusoundOptions }
+export { zusound }
