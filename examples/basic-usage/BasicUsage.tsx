@@ -16,8 +16,8 @@ interface AnotherState {
   updateTexts: (str: string) => void
 }
 
-// Create stores with proper typing
-const useCountStore = create<CountState>(
+// Create stores with and without generic typing
+const useCountStore = create(
   zusound(set => ({
     count: 0,
     increment: () => set(state => ({ count: state.count + 1 })),
