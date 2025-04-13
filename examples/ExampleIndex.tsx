@@ -34,6 +34,14 @@ const exampleLinks: ExampleLink[] = [
     path: '/middlewares',
     image: `${import.meta.env.BASE_URL}examples/assets/middlewares.png`,
   },
+  {
+    id: 'visualizer',
+    title: 'Visualizer',
+    description:
+      'Demonstrates the WebGL-based visualizer component that provides visual feedback for sonification events. See real-time 3D animations that represent different sound characteristics.',
+    path: '/visualizer',
+    image: `${import.meta.env.BASE_URL}examples/assets/visualizer.png`,
+  },
 ]
 
 function ExampleCard({ example }: { example: ExampleLink }) {

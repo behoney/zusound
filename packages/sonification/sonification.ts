@@ -166,6 +166,16 @@ export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
       setTimeout(() => {
         try {
           playSonicChunk(chunk)
+
+          // Dispatch custom event for visualizer
+          if (typeof window !== 'undefined') {
+            // Use a namespace to avoid DOM-based dependency on the visualizer package
+            // This allows consumers to listen for this event without importing the visualizer
+            const event = new CustomEvent('zusound', {
+              detail: { chunk },
+            })
+            window.dispatchEvent(event)
+          }
         } catch (err) {
           // Catch errors specifically from the asynchronous playSonicChunk call
           console.error(
