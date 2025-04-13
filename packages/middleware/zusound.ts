@@ -1,7 +1,6 @@
 import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
 import type { TraceOptions, TraceData } from '../core' // Core trace functionality
 import { trace } from '../core' // Core trace functionality
-import type { DiffResult } from '../diff' // Diff result type
 import type { Zusound, ZusoundOptions } from './types' // Middleware-specific types
 import { isProduction } from './utils' // Utility functions
 import { sonifyChanges } from '../sonification' // Sonification function

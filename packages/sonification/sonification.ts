@@ -231,6 +231,7 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 export function sonifyChanges<T>(
   diff: Partial<T>,
   duration: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _persistVisualizer: boolean = false // Parameter kept for signature compatibility, but unused
 ): void {
   try {
