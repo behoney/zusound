@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useState } from 'react'
 import { create } from 'zustand'
 import { zusound } from '../../packages'
 import { VisualizerReact } from '../../packages/visualizer'
@@ -13,36 +13,36 @@ interface CounterState {
     reset: () => void
 }
 
-// Create a store with zusound middleware
+// Create a store with zusound middleware and persistVisualizer option
 const useCounterStore = create<CounterState>()(
-    zusound((set) => ({
-        count: 0,
-        increment: () => set((state) => ({ count: state.count + 1 })),
-        decrement: () => set((state) => ({ count: state.count - 1 })),
-        reset: () => set({ count: 0 }),
-    }))
+    zusound(
+        (set) => ({
+            count: 0,
+            increment: () => set((state) => ({ count: state.count + 1 })),
+            decrement: () => set((state) => ({ count: state.count - 1 })),
+            reset: () => set({ count: 0 }),
+        }),
+        {
+            // Enable persistent visualizer which shows a dialog when audio is blocked
+            persistVisualizer: true
+        }
+    )
 )
 
 // Example using the visualizer
 const VisualizerExample: React.FC = () => {
     const { count, increment, decrement, reset } = useCounterStore()
-
-    // Initialize the visualizer (alternative to using the React component)
-    useEffect(() => {
-        // You can also use this approach to initialize the visualizer
-        // const cleanup = initializeVisualizer();
-        // return cleanup;
-    }, [])
+    const [visualizerPosition, setVisualizerPosition] = useState<'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center'>('top-right')
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-6">Zusound Visualizer Example</h1>
+            <h1 className="text-3xl font-bold mb-6">ZuSound Visualizer Example</h1>
 
             <div className="mb-8 p-6 border rounded bg-gray-50">
                 <p className="mb-4">
-                    This example demonstrates the Zusound visualizer. The visualizer shows sound events triggered
-                    by state changes. Click the buttons below to trigger different sounds and watch the visualizer
-                    in the top-right corner.
+                    This example demonstrates the ZuSound visualizer with the <code>persistVisualizer</code> option enabled.
+                    When browser autoplay policy prevents audio playback, a dialog appears explaining the situation,
+                    and the visualizer continues to provide visual feedback.
                 </p>
 
                 <div className="flex items-center gap-4 mb-6">
@@ -70,6 +70,42 @@ const VisualizerExample: React.FC = () => {
                     </button>
                 </div>
 
+                <div className="mb-6">
+                    <h2 className="text-xl font-semibold mb-2">Visualizer Position:</h2>
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={() => setVisualizerPosition('top-right')}
+                            className={`px-3 py-1 rounded ${visualizerPosition === 'top-right' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                        >
+                            Top Right
+                        </button>
+                        <button
+                            onClick={() => setVisualizerPosition('top-left')}
+                            className={`px-3 py-1 rounded ${visualizerPosition === 'top-left' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                        >
+                            Top Left
+                        </button>
+                        <button
+                            onClick={() => setVisualizerPosition('bottom-right')}
+                            className={`px-3 py-1 rounded ${visualizerPosition === 'bottom-right' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                        >
+                            Bottom Right
+                        </button>
+                        <button
+                            onClick={() => setVisualizerPosition('bottom-left')}
+                            className={`px-3 py-1 rounded ${visualizerPosition === 'bottom-left' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                        >
+                            Bottom Left
+                        </button>
+                        <button
+                            onClick={() => setVisualizerPosition('center')}
+                            className={`px-3 py-1 rounded ${visualizerPosition === 'center' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                        >
+                            Center
+                        </button>
+                    </div>
+                </div>
+
                 <div className="mb-4">
                     <h2 className="text-xl font-semibold mb-2">Features:</h2>
                     <ul className="list-disc pl-6">
@@ -77,12 +113,13 @@ const VisualizerExample: React.FC = () => {
                         <li>Each sound type (string, number, boolean) has a distinct color</li>
                         <li>Visual representation of frequency, magnitude, and sound type</li>
                         <li>Works even when audio is disabled (browser policy)</li>
+                        <li><strong>persistVisualizer option</strong> shows dialog when audio is blocked</li>
                     </ul>
                 </div>
             </div>
 
             {/* Visualizer Component */}
-            <VisualizerReact position="top-right" />
+            <VisualizerReact position={visualizerPosition} />
 
             {/* Source Code Viewer */}
             <CodeViewer

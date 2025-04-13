@@ -82,17 +82,22 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
 /**
  * Play a sonic chunk using the Web Audio API
  * @param chunk - The sonic chunk to play
+ * @param persistVisualizer - Whether to show visualizer dialog if audio is blocked
  * @throws Error if Web Audio API is not supported or audio cannot be played
  */
-export function playSonicChunk(chunk: SonicChunk): void {
+export function playSonicChunk(chunk: SonicChunk, persistVisualizer: boolean = false): void {
   // TODO(#11):: long function, refactor this into smaller functions
   try {
     const ctx = AudioContextManager.getInstance().getContext()
 
     // If audio context is suspended (e.g., browser autoplay policy), try to resume it
     if (ctx.state === 'suspended') {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ctx.resume().catch(err => {})
+      // Try to resume the context, showing visualizer dialog if persistVisualizer is true
+      AudioContextManager.getInstance()
+        .tryResumeAudioContext(persistVisualizer)
+        .catch(err => {
+          console.warn('Could not resume audio context:', err)
+        })
     }
 
     const now = ctx.currentTime
@@ -152,8 +157,13 @@ export function playSonicChunk(chunk: SonicChunk): void {
  * Play a sonic representation of state changes
  * @param diff - The object containing state changes to sonify
  * @param duration - Base duration for each sonic chunk in milliseconds
+ * @param persistVisualizer - Whether to show visualizer dialog if audio is blocked
  */
-export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
+export function sonifyChanges<T>(
+  diff: Partial<T>,
+  duration: number,
+  persistVisualizer: boolean = false
+): void {
   try {
     const chunks = diffToSonic(diff, duration)
 
@@ -165,7 +175,7 @@ export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
     chunks.forEach((chunk, index) => {
       setTimeout(() => {
         try {
-          playSonicChunk(chunk)
+          playSonicChunk(chunk, persistVisualizer)
 
           // Dispatch custom event for visualizer
           if (typeof window !== 'undefined') {

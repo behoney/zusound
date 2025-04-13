@@ -2,6 +2,7 @@ import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
 import { type TraceOptions, type TraceData, trace } from '../core'
 import { Zusound, ZusoundOptions } from './types'
 import { isProduction } from './utils'
+import { sonifyChanges } from '../sonification'
 
 /**
  * zusound middleware for Zustand
@@ -23,6 +24,7 @@ export const zusound: Zusound = <
     allowInProduction = false,
     onTrace: userOnTrace, // Rename original onTrace to avoid conflict
     diffFn,
+    persistVisualizer = false, // Default to false if not provided
     ...restOptions
   } = options
 
@@ -37,10 +39,26 @@ export const zusound: Zusound = <
     return initializer as unknown as StateCreator<T, Mps, [...Mcs]>
   }
 
+  // --- Create custom trace processor with persistVisualizer option ---
+  const customOnTrace = (traceData: TraceData<T>) => {
+    // Use sonifyChanges with the persistVisualizer option
+    sonifyChanges(traceData.diff, traceData.duration, persistVisualizer)
+
+    // Call the user's original onTrace if it exists
+    if (userOnTrace) {
+      try {
+        userOnTrace(traceData)
+      } catch (error) {
+        console.error("Error in user-provided 'onTrace' callback:", error)
+      }
+    }
+  }
+
   // --- Prepare TraceOptions ---
   const traceOptions: TraceOptions<T> = {
     ...restOptions,
     diffFn, // Pass the diff function if provided
+    onTrace: customOnTrace, // Use our custom trace processor
   }
 
   // --- Setup Logging ---
@@ -50,22 +68,18 @@ export const zusound: Zusound = <
       window['__zusound_logger__'] = []
     }
 
+    // Wrap the existing onTrace to add logging
+    const originalOnTrace = traceOptions.onTrace
     traceOptions.onTrace = (traceData: TraceData<T>) => {
       if (typeof window !== 'undefined' && window['__zusound_logger__']) {
         window['__zusound_logger__'].push(traceData)
       }
-      // Call the user's original onTrace if it exists
-      if (userOnTrace) {
-        try {
-          userOnTrace(traceData)
-        } catch (error) {
-          console.error("Error in user-provided 'onTrace' callback:", error)
-        }
+
+      // Call the original onTrace (which includes sonification)
+      if (originalOnTrace) {
+        originalOnTrace(traceData)
       }
     }
-  } else if (userOnTrace) {
-    // If only userOnTrace is provided (no logDiffs)
-    traceOptions.onTrace = userOnTrace
   }
 
   // Call the core trace function with the initializer and options
