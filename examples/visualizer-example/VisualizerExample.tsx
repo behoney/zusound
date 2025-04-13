@@ -1,7 +1,6 @@
 import React from 'react'
 import { create } from 'zustand'
 import { zusound } from '../../packages'
-// VisualizerReact component is no longer used directly.
 import { CodeViewer } from '../CodeViewer'
 import visualizerExampleSource from './VisualizerExample.tsx?raw'
 
@@ -23,10 +22,10 @@ const useCounterStore = create<CounterState>()(
             reset: () => set({ count: 0 }),
         }),
         {
-            // Enable persistent visualizer which shows a dialog when audio is blocked
-            persistVisualizer: true,
-        }
-    )
+          // Enable the dialog+visualizer fallback for blocked audio
+          persistVisualizer: true,
+      }
+  )
 )
 
 // Example demonstrating the integrated visualizer dialog
@@ -37,95 +36,102 @@ const VisualizerExample: React.FC = () => {
         <div className="container mx-auto p-6">
             <h1 className="text-3xl font-bold mb-6">ZuSound Visualizer Integration</h1>
 
-            {/* VisualizerReact component is removed. The visualizer is now internal to the dialog. */}
+          {/* The visualizer is NOT rendered here directly */}
 
-            <div className="mb-8 p-6 border rounded bg-gray-50">
-                <h2 className="text-xl font-semibold mb-2">Demonstration</h2>
-                <p className="mb-4">
-                    This example uses the <code>persistVisualizer: true</code> option in the `zusound`
-                    middleware. **Important:** The WebGL visualizer is no longer a separate component always visible
-                    in the corner. Instead, it is now embedded *within* the dialog that appears automatically
-                    **only if** the browser blocks audio playback due to autoplay restrictions (when you see
-                    <code>The AudioContext was not allowed to start...</code> in the console).
-                </p>
-                <p className="mb-4">
-                    <strong>To see the dialog and the visualizer inside it:</strong>
-                </p>
-                <ol className="list-decimal pl-6 mb-4 space-y-1">
-                    <li>
-                        Ensure your browser's autoplay policy might block audio initially. This often requires a page
-                        reload **without** having interacted with the page beforehand. You might need to clear site
-                        settings or use a fresh browser profile for reliable testing.
-                    </li>
-                    <li>Reload the page.</li>
-                    <li>
-                        Click the "Increment" or "Decrement" buttons **before clicking anywhere else** on the
-                        page.
-                    </li>
-                    <li>
-                        If audio is successfully blocked, a dialog should appear. This dialog contains the WebGL
-                        visualizer, an explanation, and a button to enable audio.
-                    </li>
-                    <li>
-                        Observe the visualizer **inside the dialog** reacting to the button clicks, providing
-                        visual feedback even though sound isn't playing yet.
-                    </li>
-                    <li>
-                        Clicking the "Enable Audio" button in the dialog, or interacting anywhere else on the page,
-                        should dismiss the dialog and allow sounds to play normally on subsequent actions.
-                    </li>
-                </ol>
+          <div className="mb-8 p-6 border rounded bg-gray-50">
+              <h2 className="text-xl font-semibold mb-2">Demonstration</h2>
+              <p className="mb-4">
+                  This example uses the <code>persistVisualizer: true</code> option in the `zusound`
+                  middleware. This option **does not** display a visualizer permanently.
+              </p>
+              <p className="mb-4">
+                  Instead, its purpose is to handle browser autoplay restrictions gracefully:
+              </p>
+              <ul className="list-disc pl-6 mb-4 space-y-1">
+                  <li>
+                      When the browser blocks audio initially (often requires loading the page without prior
+                      interaction), ZuSound detects this.
+                  </li>
+                  <li>
+                      Because <code>persistVisualizer: true</code> is set, a **modal dialog** automatically
+                      appears.
+                  </li>
+                  <li>
+                      This dialog explains that audio is blocked and contains an embedded **WebGL
+                      visualizer**.
+                  </li>
+                  <li>
+                      The visualizer inside the dialog provides feedback for state changes, even though you
+                      can't hear the sounds yet.
+                  </li>
+                  <li>
+                      Clicking the "Enable Audio" button in the dialog (or interacting elsewhere on the page)
+                      allows the audio context to resume, closes the dialog, and enables normal sound feedback
+                      for subsequent actions.
+                  </li>
+              </ul>
+              <p className="mb-4">
+                  <strong>To reliably see the dialog and the embedded visualizer:</strong>
+              </p>
+              <ol className="list-decimal pl-6 mb-4 space-y-1">
+                  <li>
+                      **Hard reload** the page (e.g., Ctrl+Shift+R or Cmd+Shift+R) to ensure no prior
+                      interaction is registered for autoplay purposes. Using an incognito window might also
+                      help.
+                  </li>
+                  <li>
+                      **Immediately** click the "Increment" or "Decrement" buttons **before** clicking
+                      anywhere else.
+                  </li>
+                  <li>
+                      If audio was successfully blocked by your browser, the dialog should appear, showing the
+                      visualizer reacting to the click.
+                  </li>
+                  <li>
+                      Interact with the dialog's "Enable Audio" button or click elsewhere on the page to
+                      enable sound for future actions.
+                  </li>
+              </ol>
 
-                <div className="flex items-center gap-4 mb-6 border-t pt-4 mt-4">
-                    <button
-                        onClick={decrement}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                    >
-                        Decrement
-                    </button>
+              <div className="flex items-center gap-4 mb-6 border-t pt-4 mt-4">
+                  <button
+                      onClick={decrement}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                      aria-label="Decrement count"
+                  >
+                      Decrement
+                  </button>
 
-                    <div className="text-2xl font-bold min-w-[50px] text-center">{count}</div>
+                  <div className="text-2xl font-bold min-w-[50px] text-center" aria-live="polite">
+                      {count}
+                  </div>
 
-                    <button
-                        onClick={increment}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                    >
-                        Increment
-                    </button>
+                  <button
+                      onClick={increment}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                      aria-label="Increment count"
+                  >
+                      Increment
+                  </button>
 
-                    <button
-                        onClick={reset}
-                        className="px-4 py-2 bg-red-500 text-white rounded ml-4 hover:bg-red-600 transition-colors"
-                    >
-                        Reset
-                    </button>
-                </div>
+                  <button
+                      onClick={reset}
+                      className="px-4 py-2 bg-red-500 text-white rounded ml-4 hover:bg-red-600 transition-colors"
+                      aria-label="Reset count"
+                  >
+                      Reset
+                  </button>
+              </div>
+          </div>
 
-                <div className="mt-6">
-                    <h2 className="text-xl font-semibold mb-2">Key Features Demonstrated:</h2>
-                    <ul className="list-disc pl-6 space-y-1">
-                        <li>
-                            Visualizer appears automatically within a modal dialog **only** when audio is blocked by the
-                            browser's autoplay policy (requires `persistVisualizer: true`).
-                        </li>
-                        <li>Visual feedback is provided **inside the dialog** even if audio cannot play initially.</li>
-                        <li>The dialog provides context about the blocked audio and an action to enable it.</li>
-                        <li>
-                            Seamless integration – no need to manually import or render a separate visualizer
-                            component.
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            {/* Source Code Viewer */}
-            <CodeViewer
-                code={visualizerExampleSource}
-                language="tsx"
-                title="View VisualizerExample.tsx Source"
-            />
-        </div>
-    )
+          {/* Source Code Viewer */}
+          <CodeViewer
+              code={visualizerExampleSource}
+              language="tsx"
+              title="View VisualizerExample.tsx Source"
+          />
+      </div>
+  )
 }
 
 export default VisualizerExample

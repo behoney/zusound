@@ -1,19 +1,13 @@
-// TODO:: Implement visualizer
-// we need visualizer for the following:
-// all the sonification events should be visualized in the UI at least the sound isn't playing because a browser requires any user input to play sound. so that we can't play sound until that and need to show the zusound in the mini right-top UI that shows minimum visualizing.
-
-// this file is just for the visualizer. so the only logic here is to write how to visualize the sonification event.
-// And it will 64*64 pixel size visualizer. and it will be better when we maximize to utilize the WebGL Shaders.
-
 // Visualizer for sonification events
-// A small 64x64 pixel WebGL-based visualizer, intended to be embedded within
-// the autoplay warning dialog.
+// Renders visualization to a canvas based on 'zusound' events.
 
-import type { SonicChunk } from '../sonification' // Adjusted import path
-import type { ZusoundEvent, ZusoundEventDetail } from './types' // Import ZusoundEventDetail
+import type { SonicChunk } from '../sonification'
+import type { ZusoundEvent, ZusoundEventDetail } from './types'
 
-// Export types
+// Export core types
 export * from './types'
+// Export persistent UI functions directly
+export { showPersistentVisualizer, hidePersistentVisualizer } from './dialog'
 
 // Constants for visualizer configuration
 const VISUALIZER_SIZE = 64
@@ -26,6 +20,12 @@ interface VisualizerEvent {
   startTime: number
   /** Progress from 0 to 1 representing the event's lifetime */
   getProgress: () => number
+}
+
+// Declare the global variable for the singleton
+declare global {
+  // eslint-disable-next-line no-var
+  var __VISUALIZER_SINGLETON__: Visualizer | undefined
 }
 
 /**
@@ -49,7 +49,6 @@ class VisualizerShaderManager {
     
     void main() {
       gl_Position = vec4(a_position, 0.0, 1.0);
-      // Map from clip space (-1 to +1) to texture coord space (0 to 1)
       v_texCoord = a_position * 0.5 + 0.5;
     }
   `
@@ -59,16 +58,13 @@ class VisualizerShaderManager {
     precision mediump float;
     varying vec2 v_texCoord;
     
-    // Array of sound events (up to MAX_VISIBLE_EVENTS)
     uniform int u_eventCount;
     uniform float u_eventProgress[${MAX_VISIBLE_EVENTS}];
     uniform float u_eventFrequency[${MAX_VISIBLE_EVENTS}];
     uniform float u_eventMagnitude[${MAX_VISIBLE_EVENTS}];
     uniform float u_eventDetune[${MAX_VISIBLE_EVENTS}];
     uniform int u_eventType[${MAX_VISIBLE_EVENTS}]; // 0=sine, 1=square, 2=sawtooth, 3=triangle
-    uniform int u_eventValueType[${MAX_VISIBLE_EVENTS}]; // 0=add, 1=remove, 2=change
     
-    // Convert sound type to color
     vec3 getTypeColor(int type) {
       if (type == 0) return vec3(0.2, 0.6, 1.0); // sine - blue
       if (type == 1) return vec3(1.0, 0.5, 0.2); // square - orange
@@ -76,126 +72,80 @@ class VisualizerShaderManager {
       return vec3(1.0, 0.3, 0.8); // triangle - pink
     }
     
-    // Shape function based on sound type (0-1 range)
     float getWaveShape(int type, float t) {
-      t = fract(t); // Ensure 0-1 range
-      if (type == 0) return 0.5 + 0.5 * sin(t * 6.28318); // sine
-      if (type == 1) return t < 0.5 ? 0.0 : 1.0; // square
-      if (type == 2) return t; // sawtooth
-      return t < 0.5 ? t * 2.0 : 2.0 - t * 2.0; // triangle
+      t = fract(t);
+      if (type == 0) return 0.5 + 0.5 * sin(t * 6.28318);
+      if (type == 1) return t < 0.5 ? 0.0 : 1.0;
+      if (type == 2) return t;
+      return t < 0.5 ? t * 2.0 : 2.0 - t * 2.0;
     }
     
     void main() {
-      // Center coordinates at (0,0) and scale to -1 to 1
       vec2 p = (v_texCoord * 2.0 - 1.0);
-      
-      // Initialize with background color (dark)
       vec3 color = vec3(0.1, 0.1, 0.15);
       float alpha = 1.0;
-      
-      // Circular background glow
       float bgGlow = 1.0 - length(p);
       color += vec3(0.05, 0.05, 0.1) * max(0.0, bgGlow);
       
-      // Process each active event
       for (int i = 0; i < ${MAX_VISIBLE_EVENTS}; i++) {
         if (i >= u_eventCount) break;
-        
-        // Skip events that are complete
         if (u_eventProgress[i] >= 1.0) continue;
         
-        // Calculate event parameters
         float progress = u_eventProgress[i];
         float magnitude = u_eventMagnitude[i];
-        float frequency = u_eventFrequency[i] / 440.0; // Normalize to A4
-        float detune = u_eventDetune[i] / 1200.0; // Convert cents to ratio
+        float frequency = u_eventFrequency[i] / 440.0;
+        float detune = u_eventDetune[i] / 1200.0;
         float scaledFreq = frequency * pow(2.0, detune);
         int type = u_eventType[i];
-        int valueType = u_eventValueType[i];
         
-        // Event lifecycle animation
         float fadeIn = smoothstep(0.0, 0.1, progress);
         float fadeOut = 1.0 - smoothstep(0.7, 1.0, progress);
         float visibility = fadeIn * fadeOut;
-        
-        // Distance from center
         float dist = length(p);
-        
-        // Ring effect based on frequency
         float ringWidth = 0.05 * magnitude;
         float ringSize = 0.3 + 0.7 * (1.0 - progress);
         float ring = smoothstep(ringSize - ringWidth, ringSize, dist) * 
                      smoothstep(ringSize + ringWidth, ringSize, dist);
-        
-        // Wave ripples based on frequency
         float ripples = getWaveShape(type, dist * 10.0 * scaledFreq);
-        
-        // Color based on sound type
         vec3 eventColor = getTypeColor(type);
-        
-        // Apply brightness based on remove (dimmer) or change (brighter)
-        float brightness = valueType == 1 ? 0.6 : 1.0;
-        
-        // Combine effects
-        float eventEffect = (ring * 0.8 + ripples * 0.2) * visibility * magnitude * brightness;
-        
-        // Add to final color (additive blending)
+        float eventEffect = (ring * 0.8 + ripples * 0.2) * visibility * magnitude;
         color += eventColor * eventEffect;
       }
       
-      // Output final color
       gl_FragColor = vec4(color, alpha);
     }
   `
 
   constructor() {
-    // Create canvas element
     this.canvas = document.createElement('canvas')
     this.canvas.width = VISUALIZER_SIZE
     this.canvas.height = VISUALIZER_SIZE
-    // Style the canvas for use within the dialog
-    this.canvas.style.borderRadius = '50%'
-    this.canvas.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)'
-    this.canvas.style.display = 'block' // Ensure it takes block layout space
-    this.canvas.style.margin = '0 auto 16px auto' // Center horizontally, add bottom margin
+    // Basic styling - persistentUI.ts handles layout
+    this.canvas.style.display = 'block'
+    this.canvas.style.borderRadius = '50%' // Keep the round style
   }
 
-  /**
-   * Returns the canvas element managed by this instance.
-   */
   public getCanvasElement(): HTMLCanvasElement {
     return this.canvas
   }
 
-  /**
-   * Initializes the WebGL context and shader program
-   */
   public initialize(): boolean {
-    if (this.gl) return true // Already initialized
+    if (this.gl) return true
+    if (typeof window === 'undefined') return false
 
     try {
-      // Get WebGL context
       this.gl = this.canvas.getContext('webgl')
       if (!this.gl) {
         console.error('WebGL not supported')
         return false
       }
 
-      // Create shader program
       const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, this.vertexShaderSource)
       const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, this.fragmentShaderSource)
+      if (!vertexShader || !fragmentShader) return false
 
-      if (!vertexShader || !fragmentShader) {
-        return false
-      }
-
-      // Link the program
       this.program = this.gl.createProgram()
-      if (!this.program) {
-        console.error('Failed to create WebGL program')
-        return false
-      }
-
+      if (!this.program) return false
       this.gl.attachShader(this.program, vertexShader)
       this.gl.attachShader(this.program, fragmentShader)
       this.gl.linkProgram(this.program)
@@ -204,37 +154,20 @@ class VisualizerShaderManager {
         console.error('Could not link WebGL program:', this.gl.getProgramInfoLog(this.program))
         return false
       }
-
-      // Use the program
       this.gl.useProgram(this.program)
 
-      // Set up the vertex buffer (a simple quad)
-      const positions = [
-        -1,
-        -1, // bottom left
-        1,
-        -1, // bottom right
-        -1,
-        1, // top left
-        1,
-        1, // top right
-      ]
-
+      const positions = [-1, -1, 1, -1, -1, 1, 1, 1]
       this.vertexBuffer = this.gl.createBuffer()
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer)
       this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW)
 
-      // Get attribute locations
       const positionAttrib = this.gl.getAttribLocation(this.program, 'a_position')
       this.gl.enableVertexAttribArray(positionAttrib)
       this.gl.vertexAttribPointer(positionAttrib, 2, this.gl.FLOAT, false, 0, 0)
 
-      // Store uniform locations
       this.uniforms = {
         u_eventCount: this.gl.getUniformLocation(this.program, 'u_eventCount'),
       }
-
-      // Store array uniform locations
       for (let i = 0; i < MAX_VISIBLE_EVENTS; i++) {
         this.uniforms[`u_eventProgress[${i}]`] = this.gl.getUniformLocation(
           this.program,
@@ -256,115 +189,79 @@ class VisualizerShaderManager {
           this.program,
           `u_eventType[${i}]`
         )
-        this.uniforms[`u_eventValueType[${i}]`] = this.gl.getUniformLocation(
-          this.program,
-          `u_eventValueType[${i}]`
-        )
       }
 
       return true
     } catch (err) {
       console.error('Failed to initialize WebGL visualizer:', err)
+      this.gl = null // Ensure cleanup on partial failure
+      this.program = null
       return false
     }
   }
 
-  /**
-   * Compile a WebGL shader
-   */
   private compileShader(type: number, source: string): WebGLShader | null {
     if (!this.gl) return null
-
     const shader = this.gl.createShader(type)
-    if (!shader) {
-      console.error('Failed to create shader')
-      return null
-    }
-
+    if (!shader) return null
     this.gl.shaderSource(shader, source)
     this.gl.compileShader(shader)
-
     if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-      console.error('Failed to compile shader:', this.gl.getShaderInfoLog(shader))
+      console.error(
+        `Shader compile error (${type === this.gl.VERTEX_SHADER ? 'Vertex' : 'Fragment'}):`,
+        this.gl.getShaderInfoLog(shader)
+      )
       this.gl.deleteShader(shader)
       return null
     }
-
     return shader
   }
 
-  /**
-   * Indicate that the visualizer canvas has been mounted to the DOM.
-   * Starts the render loop.
-   */
   public notifyMounted(): void {
     this.isMounted = true
     this.startRenderLoop()
   }
 
-  /**
-   * Indicate that the visualizer canvas has been removed from the DOM.
-   * Stops the render loop.
-   */
   public notifyUnmounted(): void {
     this.isMounted = false
     this.stopRenderLoop()
   }
 
-  /**
-   * Add a sound event to the visualizer queue
-   */
   public addEvent(chunk: SonicChunk): void {
     const now = performance.now()
-
     const event: VisualizerEvent = {
       chunk,
       startTime: now,
-      getProgress: () => {
-        const elapsed = performance.now() - event.startTime
-        return Math.min(1, elapsed / EVENT_LIFETIME_MS)
-      },
+      getProgress: () => Math.min(1, (performance.now() - event.startTime) / EVENT_LIFETIME_MS),
     }
-
-    // Add to the events array, limiting to max events
     this.events.push(event)
     if (this.events.length > MAX_VISIBLE_EVENTS) {
-      this.events.shift() // Remove oldest event
+      this.events.shift()
     }
-
-    // Ensure render loop is running if mounted
     if (this.isMounted) {
-      this.startRenderLoop()
+      this.startRenderLoop() // Ensure loop runs if we add an event while mounted but idle
     }
   }
 
-  /**
-   * Start the render loop if not already running
-   */
   private startRenderLoop(): void {
     if (this.animationFrameId !== null || !this.isMounted) return
-
     const renderFrame = () => {
-      // Check if still mounted before rendering
       if (!this.isMounted) {
-        this.animationFrameId = null // Stop loop if unmounted
+        this.animationFrameId = null
         return
       }
       this.render()
-      // Continue loop only if there are active events or potentially new ones coming
-      if (this.events.length > 0 || this.isMounted) {
+      // Keep looping only if mounted and there are active events
+      this.events = this.events.filter(event => event.getProgress() < 1) // Prune finished events before check
+      if (this.events.length > 0) {
         this.animationFrameId = requestAnimationFrame(renderFrame)
       } else {
-        this.animationFrameId = null // Stop if no events and unmounted
+        this.animationFrameId = null // Stop if no events are active
       }
     }
-
     this.animationFrameId = requestAnimationFrame(renderFrame)
   }
 
-  /**
-   * Stop the render loop
-   */
   private stopRenderLoop(): void {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId)
@@ -372,102 +269,62 @@ class VisualizerShaderManager {
     }
   }
 
-  /**
-   * Render the current state of the visualizer
-   */
   private render(): void {
-    // Don't render if not initialized or not mounted
     if (!this.gl || !this.program || !this.isMounted) return
 
-    // Filter out completed events
-    this.events = this.events.filter(event => event.getProgress() < 1)
-
-    // If no events left, potentially stop rendering? Or keep background? Let's keep background.
-    // if (this.events.length === 0) {
-    //   // Optionally clear or just draw background?
-    //   // this.stopRenderLoop(); // Maybe stop loop if no events? Let's keep it running for now.
-    //   // return;
-    // }
-
-    // Clear the canvas (important for transparency if container is styled)
-    this.gl.clearColor(0, 0, 0, 0) // Use transparent clear color
+    this.gl.clearColor(0, 0, 0, 0)
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
-
-    // Ensure the program is active
     this.gl.useProgram(this.program)
-    // Bind vertex buffer
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer)
     const positionAttrib = this.gl.getAttribLocation(this.program, 'a_position')
     this.gl.enableVertexAttribArray(positionAttrib)
     this.gl.vertexAttribPointer(positionAttrib, 2, this.gl.FLOAT, false, 0, 0)
 
-    // Update uniforms with event data
     this.gl.uniform1i(this.uniforms.u_eventCount, this.events.length)
+    const typeMapping: Record<SonicChunk['type'], number> = {
+      sine: 0,
+      square: 1,
+      sawtooth: 2,
+      triangle: 3,
+    }
 
     for (let i = 0; i < MAX_VISIBLE_EVENTS; i++) {
       if (i < this.events.length) {
         const event = this.events[i]
         const progress = event.getProgress()
         const chunk = event.chunk
-
-        // Wave type mapping: sine=0, square=1, sawtooth=2, triangle=3
-        const typeMapping: Record<SonicChunk['type'], number> = {
-          sine: 0,
-          square: 1,
-          sawtooth: 2,
-          triangle: 3,
-        }
-
-        // Value type mapping: add=0, remove=1, change=2
-        const valueTypeMapping: Record<SonicChunk['valueType'], number> = {
-          add: 0, // 'add' isn't used currently, maps to 'change' in diffToSonic
-          remove: 1,
-          change: 2,
-        }
-
-        // Set uniform values for this event
         this.gl.uniform1f(this.uniforms[`u_eventProgress[${i}]`], progress)
         this.gl.uniform1f(this.uniforms[`u_eventFrequency[${i}]`], chunk.frequency)
         this.gl.uniform1f(this.uniforms[`u_eventMagnitude[${i}]`], chunk.magnitude)
         this.gl.uniform1f(this.uniforms[`u_eventDetune[${i}]`], chunk.detune)
         this.gl.uniform1i(this.uniforms[`u_eventType[${i}]`], typeMapping[chunk.type])
-        this.gl.uniform1i(
-          this.uniforms[`u_eventValueType[${i}]`],
-          valueTypeMapping[chunk.valueType]
-        )
       } else {
-        // Optionally clear uniforms for slots beyond the current event count, although shader logic handles this
         this.gl.uniform1f(this.uniforms[`u_eventProgress[${i}]`], 1.0) // Mark as inactive
       }
     }
-
-    // Draw the quad
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4)
   }
 
-  /**
-   * Clean up WebGL resources.
-   */
   public cleanup(): void {
     this.stopRenderLoop()
     if (this.gl) {
       if (this.program) {
-        // Detach shaders? Delete shaders? Delete program?
-        // For simplicity, just losing the context might be enough if the page navigates away.
-        // If needing robust cleanup within a single page app:
-        // this.gl.deleteProgram(this.program);
-        // this.gl.deleteBuffer(this.vertexBuffer);
-        // TODO: Delete shaders if stored
+        // Basic cleanup: delete buffer and program
+        if (this.vertexBuffer) {
+          this.gl.deleteBuffer(this.vertexBuffer)
+          this.vertexBuffer = null
+        }
+        // Optionally delete shaders if they were stored
+        this.gl.deleteProgram(this.program)
+        this.program = null
       }
-      // Attempt to lose the context
+      // Attempt to lose context gracefully
       const loseContextExt = this.gl.getExtension('WEBGL_lose_context')
       if (loseContextExt) {
         loseContextExt.loseContext()
       }
     }
     this.gl = null
-    this.program = null
-    this.vertexBuffer = null
     this.events = []
     this.isMounted = false
   }
@@ -481,278 +338,111 @@ export class Visualizer {
   private shaderManager: VisualizerShaderManager | null = null
   private isInitialized = false
   private eventListenerAttached = false
-  private isPersistentlyDisplayed = false
-  private floatingContainer: HTMLDivElement | null = null
 
   private constructor() {
     // Private constructor for singleton
-    if (typeof window !== 'undefined') {
-      // Ensure event listener is attached only once
-      this.attachEventListener()
-    }
   }
 
-  /**
-   * Get the visualizer singleton instance
-   */
   public static getInstance(): Visualizer {
     if (!Visualizer.instance) {
       Visualizer.instance = new Visualizer()
+      // Automatically try to initialize and attach listener when instance is first created
+      Visualizer.instance.initialize()
+      Visualizer.instance.attachEventListener()
+
+      // Store instance in global for access from persistentUI.ts
+      if (typeof globalThis !== 'undefined') {
+        globalThis.__VISUALIZER_SINGLETON__ = Visualizer.instance
+      }
     }
     return Visualizer.instance
   }
 
-  /**
-   * Initialize the visualizer's shader manager
-   */
+  /** Initialize shader manager. Returns true if successful or already initialized. */
   public initialize(): boolean {
     if (this.isInitialized) return true
-
-    // Ensure we are in a browser environment
-    if (typeof window === 'undefined') {
-      console.warn('Visualizer cannot initialize outside a browser environment.')
-      return false
-    }
+    if (typeof window === 'undefined') return false // Don't initialize outside browser
 
     try {
       this.shaderManager = new VisualizerShaderManager()
-      const success = this.shaderManager.initialize()
-
-      if (success) {
-        this.isInitialized = true
-        this.attachEventListener() // Ensure listener is attached post-initialization
-        return true
-      } else {
-        console.error('Failed to initialize visualizer shader manager')
-        this.shaderManager = null // Clean up partially initialized manager
-        return false
+      this.isInitialized = this.shaderManager.initialize()
+      if (!this.isInitialized) {
+        this.shaderManager = null // Cleanup failed init
+        console.error('Visualizer shader manager failed to initialize.')
       }
-    } catch (err) {
-      console.error('Error initializing visualizer:', err)
+      return this.isInitialized
+    } catch (error) {
+      console.error('Error during visualizer initialization:', error)
       this.shaderManager = null
+      this.isInitialized = false
       return false
     }
   }
 
-  /**
-   * Returns the visualizer canvas element if initialized.
-   */
+  /** Returns the canvas element IF the visualizer is initialized. */
   public getCanvasElement(): HTMLCanvasElement | null {
+    // Ensure initialized on demand
     if (!this.isInitialized && !this.initialize()) {
       return null
     }
     return this.shaderManager?.getCanvasElement() ?? null
   }
 
-  /**
-   * Notify the shader manager that the canvas has been mounted to the DOM.
-   */
   public notifyMounted(): void {
     this.shaderManager?.notifyMounted()
   }
 
-  /**
-   * Notify the shader manager that the canvas has been unmounted from the DOM.
-   */
   public notifyUnmounted(): void {
     this.shaderManager?.notifyUnmounted()
   }
 
-  /**
-   * Show a persistent visualizer in the corner of the screen regardless of audio state.
-   * This is used when persistVisualizer is true.
-   */
-  public showPersistentVisualizer(): void {
-    if (this.isPersistentlyDisplayed || typeof document === 'undefined') return
-
-    // Initialize if not already
-    if (!this.isInitialized) {
-      if (!this.initialize()) {
-        console.error('Failed to initialize visualizer for persistent display')
-        return
-      }
-    }
-
-    // Get canvas element
-    const canvas = this.getCanvasElement()
-    if (!canvas) {
-      console.error('Canvas element not available for persistent display')
-      return
-    }
-
-    // Create floating container if it doesn't exist
-    if (!this.floatingContainer) {
-      this.floatingContainer = document.createElement('div')
-      this.floatingContainer.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
-        background: rgba(30, 30, 40, 0.7);
-        border-radius: 50%;
-        padding: 4px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        cursor: pointer;
-        transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
-        backdrop-filter: blur(3px);
-      `
-
-      // Add hover effect
-      this.floatingContainer.addEventListener('mouseenter', () => {
-        if (this.floatingContainer) {
-          this.floatingContainer.style.transform = 'scale(1.1)'
-          this.floatingContainer.style.opacity = '1'
-        }
-      })
-
-      this.floatingContainer.addEventListener('mouseleave', () => {
-        if (this.floatingContainer) {
-          this.floatingContainer.style.transform = 'scale(1)'
-          this.floatingContainer.style.opacity = '0.8'
-        }
-      })
-
-      // Initial state slightly transparent
-      this.floatingContainer.style.opacity = '0.8'
-    }
-
-    // Ensure canvas has correct styling for floating display
-    canvas.style.margin = '0'
-    canvas.style.display = 'block'
-
-    // Add the canvas to the floating container
-    this.floatingContainer.appendChild(canvas)
-
-    // Add to document body
-    document.body.appendChild(this.floatingContainer)
-
-    console.log(this.floatingContainer)
-
-    // Notify visualization system that canvas is mounted
-    this.notifyMounted()
-
-    this.isPersistentlyDisplayed = true
-  }
-
-  /**
-   * Hide the persistent visualizer if it's being displayed
-   */
-  public hidePersistentVisualizer(): void {
-    if (!this.isPersistentlyDisplayed || !this.floatingContainer) return
-
-    // Notify visualization system that canvas is being unmounted
-    this.notifyUnmounted()
-
-    // Remove from DOM
-    if (this.floatingContainer.parentNode) {
-      this.floatingContainer.parentNode.removeChild(this.floatingContainer)
-    }
-
-    this.isPersistentlyDisplayed = false
-  }
-
-  /**
-   * Check if the visualizer is currently being displayed persistently
-   */
-  public isPersistentVisualizerDisplayed(): boolean {
-    return this.isPersistentlyDisplayed
-  }
-
-  /**
-   * Clean up visualizer resources.
-   */
+  /** Clean up visualizer resources. */
   public cleanup(): void {
-    this.hidePersistentVisualizer()
-    this.shaderManager?.cleanup()
     this.detachEventListener()
+    this.shaderManager?.cleanup()
     this.isInitialized = false
     this.shaderManager = null
-    this.floatingContainer = null
-    // Don't reset Visualizer.instance, allow re-initialization if needed
+    // Clear global singleton reference
+    if (typeof globalThis !== 'undefined' && globalThis.__VISUALIZER_SINGLETON__ === this) {
+      globalThis.__VISUALIZER_SINGLETON__ = undefined
+    }
+    // Optionally reset the static instance if needed for full re-init capability
+    // Visualizer.instance = null;
   }
 
-  /**
-   * Handles incoming 'zusound' events.
-   */
   private handleSonificationEvent = (event: Event) => {
-    // Check if it's the custom event we expect
     if ('detail' in event && (event as ZusoundEvent).detail?.chunk) {
-      const customEvent = event as ZusoundEvent
-      if (this.isInitialized && this.shaderManager) {
-        this.shaderManager.addEvent(customEvent.detail.chunk)
-      } else {
-        // Initialize on first event if not already done
-        if (this.initialize() && this.shaderManager) {
-          this.shaderManager.addEvent(customEvent.detail.chunk)
-        }
+      // Ensure initialized before adding event
+      if (this.isInitialized || this.initialize()) {
+        this.shaderManager?.addEvent((event as ZusoundEvent).detail.chunk)
       }
     }
   }
 
-  /**
-   * Attaches the global event listener if not already attached.
-   */
   private attachEventListener(): void {
     if (this.eventListenerAttached || typeof window === 'undefined') return
-
     window.addEventListener('zusound', this.handleSonificationEvent)
     this.eventListenerAttached = true
   }
 
-  /**
-   * Detaches the global event listener.
-   */
   private detachEventListener(): void {
     if (!this.eventListenerAttached || typeof window === 'undefined') return
-
     window.removeEventListener('zusound', this.handleSonificationEvent)
     this.eventListenerAttached = false
   }
 }
 
-/**
- * Manually visualize a sonic chunk (useful for testing or direct calls)
- * @param chunk - The sonic chunk to visualize
- */
+// Optional: Expose function to ensure visualizer is ready
+/** Ensures the visualizer singleton is initialized and listening for events. */
+export function ensureVisualizerReady(): void {
+  Visualizer.getInstance() // Accessing getInstance handles initialization
+}
+
+// Optional: Function to manually trigger visualization for testing
+/** Manually visualize a sonic chunk by dispatching the event */
 export function visualizeSonicChunk(chunk: SonicChunk): void {
-  Visualizer.getInstance().initialize() // Ensure initialized
-  // The event listener handles adding the chunk, manually adding is redundant now.
-  // Visualizer.getInstance().shaderManager?.addEvent(chunk); // Direct add if needed
-  // Dispatch event instead to use the standard flow
   if (typeof window !== 'undefined') {
-    const event = new CustomEvent<ZusoundEventDetail>('zusound', {
-      detail: { chunk },
-    })
+    const event = new CustomEvent<ZusoundEventDetail>('zusound', { detail: { chunk } })
     window.dispatchEvent(event)
   }
-}
-
-/**
- * Ensures the visualizer singleton is initialized and listening for events.
- * This is primarily for internal use or advanced scenarios. It doesn't mount UI.
- * Returns a cleanup function (currently a no-op for the singleton).
- */
-export function initializeVisualizer(): () => void {
-  const visualizer = Visualizer.getInstance()
-  visualizer.initialize()
-
-  // Return cleanup function (noop for singleton instance)
-  return () => {
-    // visualizer.cleanup(); // Cleanup might be too aggressive for singleton
-  }
-}
-
-/**
- * Shows a persistent visualizer in the corner of the screen.
- * Use this when persistVisualizer is true to always display the visualizer.
- */
-export function showPersistentVisualizer(): void {
-  Visualizer.getInstance().showPersistentVisualizer()
-}
-
-/**
- * Hides the persistent visualizer if it's being displayed.
- */
-export function hidePersistentVisualizer(): void {
-  Visualizer.getInstance().hidePersistentVisualizer()
 }

@@ -1,8 +1,4 @@
-import { Visualizer, showPersistentVisualizer } from '../visualizer' // Import the Visualizer singleton manager and showPersistentVisualizer function
-
-/**
- * Utility functions for the sonification module
- */
+import { Visualizer } from '../visualizer'
 
 /**
  * Class to manage the lifecycle of a single AudioContext instance.
@@ -10,19 +6,33 @@ import { Visualizer, showPersistentVisualizer } from '../visualizer' // Import t
 export class AudioContextManager {
   private static instance: AudioContextManager | null = null
   private audioContext: AudioContext | null = null
+  // Track if resume has been attempted and failed due to autoplay restrictions
   private isAutoplayBlocked = false
-  private visualizerDialog: HTMLDialogElement | null = null
-  private visualizerCanvasContainer: HTMLDivElement | null = null // Container for the canvas inside the dialog
-  private persistentVisualizer = false // Track whether persistent visualizer is enabled
+  // Track if a user interaction has occurred since the page loaded
+  private hasUserInteracted = false
 
   private constructor() {
-    // Private constructor to enforce singleton pattern
+    // Add interaction listener on first instantiation in browser
+    if (typeof window !== 'undefined') {
+      const interactionHandler = () => {
+        this.hasUserInteracted = true
+        // Once interacted, try to resume immediately if needed
+        if (this.audioContext?.state === 'suspended') {
+          this.tryResumeAudioContext()
+        }
+        // Remove listeners after first interaction
+        window.removeEventListener('click', interactionHandler, { capture: true })
+        window.removeEventListener('keydown', interactionHandler, { capture: true })
+        window.removeEventListener('touchstart', interactionHandler, { capture: true })
+      }
+      // Listen for various interaction types
+      window.addEventListener('click', interactionHandler, { capture: true })
+      window.addEventListener('keydown', interactionHandler, { capture: true })
+      window.addEventListener('touchstart', interactionHandler, { capture: true })
+    }
   }
 
-  /**
-   * Get the singleton instance of AudioContextManager.
-   * @returns The singleton instance of AudioContextManager.
-   */
+  /** Get the singleton instance of AudioContextManager. */
   public static getInstance(): AudioContextManager {
     if (AudioContextManager.instance === null) {
       AudioContextManager.instance = new AudioContextManager()
@@ -30,22 +40,25 @@ export class AudioContextManager {
     return AudioContextManager.instance
   }
 
-  /**
-   * Get or initialize the AudioContext.
-   * Also ensures the Visualizer singleton is initialized.
-   * @returns The managed AudioContext instance.
-   * @throws Error if Web Audio API is not supported or if context creation fails.
-   */
+  /** Get or initialize the AudioContext. */
   public getContext(): AudioContext {
     if (this.audioContext === null || this.audioContext.state === 'closed') {
+      this.isAutoplayBlocked = false
       try {
-        this.audioContext = new AudioContext()
-        // Ensure Visualizer is initialized when context is created/recreated
-        Visualizer.getInstance().initialize()
+        const contextOptions: AudioContextOptions = this.hasUserInteracted
+          ? {} // No latency hint needed if interaction occurred
+          : { latencyHint: 'interactive' } // Request lower latency before interaction
 
-        // Show persistent visualizer if enabled
-        if (this.persistentVisualizer) {
-          showPersistentVisualizer()
+        this.audioContext = new AudioContext(contextOptions)
+
+        // Ensure Visualizer singleton is instantiated/ready
+        // This is important even if we don't manage its UI here
+        Visualizer.getInstance()
+
+        // If the context *immediately* starts suspended (can happen), mark as blocked
+        if (this.audioContext.state === 'suspended') {
+          console.warn('AudioContext created in suspended state. Autoplay likely restricted.')
+          // Don't set isAutoplayBlocked = true here yet, wait for resume attempt
         }
       } catch (err: unknown) {
         this.audioContext = null
@@ -57,388 +70,114 @@ export class AudioContextManager {
     return this.audioContext
   }
 
-  /**
-   * Enable or disable persistent visualizer display.
-   * When enabled, visualizer will always be shown regardless of audio state.
-   * @param enable Whether to enable persistent visualizer
-   */
-  public setPersistentVisualizer(enable: boolean): void {
-    this.persistentVisualizer = enable
-
-    // If enabling, show visualizer immediately if the context is initialized
-    if (enable) {
-      showPersistentVisualizer()
-    } else {
-      // If disabling, only hide if we're not showing the dialog
-      if (!this.visualizerDialog || !this.visualizerDialog.open) {
-        Visualizer.getInstance().hidePersistentVisualizer()
-      }
-    }
-  }
-
-  /**
-   * Check if audio playback is blocked by browser autoplay policy
-   * @returns True if audio is blocked, false otherwise
-   */
+  /** Check if audio playback is currently likely blocked by browser autoplay policy */
   public isAudioBlocked(): boolean {
-    // Ensure context exists before checking state
-    const ctx = this.audioContext
-    return this.isAutoplayBlocked || (ctx !== null && ctx.state === 'suspended')
+    // Consider blocked if explicitly marked, or if context exists and is suspended
+    return (
+      this.isAutoplayBlocked || (!!this.audioContext && this.audioContext.state === 'suspended')
+    )
   }
 
   /**
-   * Attempt to resume audio context if suspended
-   * @param showVisualizerDialogIfBlocked If true, show the dialog containing the visualizer if resume fails
-   * @returns Promise resolving to true if context is running, false if still suspended
+   * Attempt to resume audio context if suspended.
+   * Returns status indicating success, failure, or if it was already running.
+   * @returns Promise resolving to an object { resumed: boolean, blocked: boolean }
    */
-  public async tryResumeAudioContext(
-    showVisualizerDialogIfBlocked: boolean = false
-  ): Promise<boolean> {
-    const ctx = this.audioContext // Get current context instance
-
-    // Check if context exists and is actually suspended
-    if (!ctx || ctx.state !== 'suspended') {
-      return ctx ? ctx.state === 'running' : false // Return true if running, false otherwise
+  public async tryResumeAudioContext(): Promise<{ resumed: boolean; blocked: boolean }> {
+    // Ensure context exists first. If not, cannot resume.
+    if (!this.audioContext) {
+      try {
+        // Attempt to create context if it doesn't exist yet
+        this.getContext()
+      } catch {
+        console.error('Cannot resume: AudioContext failed to initialize.')
+        return { resumed: false, blocked: true }
+      }
+    }
+    // Add null check before accessing state
+    if (!this.audioContext) {
+      // This case should theoretically be covered by the above, but belt-and-suspenders
+      console.error('Cannot resume: AudioContext is null unexpectedly.')
+      return { resumed: false, blocked: true }
     }
 
-    try {
-      // Use Promise.race with a timeout to handle cases where resume() might never resolve/reject
-      const resumeResult = await Promise.race([
-        ctx.resume().then(() => {
-          console.log(`AudioContext resumed successfully, current state: ${ctx.state}`)
-          return 'resumed'
-        }),
-        // Add a timeout to ensure we don't hang indefinitely
-        new Promise<string>(resolve =>
-          setTimeout(() => {
-            console.warn('AudioContext resume() timed out after 1000ms')
-            resolve('timeout')
-          }, 1000)
-        ),
-      ])
+    // If context is closed, cannot resume.
+    if (this.audioContext.state === 'closed') {
+      console.warn('Cannot resume: AudioContext is closed.')
+      return { resumed: false, blocked: false }
+    }
 
-      if (resumeResult === 'timeout') {
-        console.warn(
-          `Audio context resume timed out - browser may be blocking audio. Current state: ${ctx.state}`
+    // If already running, no action needed.
+    if (this.audioContext.state === 'running') {
+      this.isAutoplayBlocked = false
+      return { resumed: true, blocked: false }
+    }
+
+    // Only proceed if suspended
+    if (this.audioContext.state === 'suspended') {
+      console.log('Attempting to resume suspended AudioContext...')
+      try {
+        // Add null check before calling resume
+        if (!this.audioContext) throw new Error('AudioContext became null before resume')
+        const resumePromise = this.audioContext.resume()
+        const timeoutPromise = new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('AudioContext resume timed out after 1000ms')), 1000)
         )
-        throw new Error('Audio context resume timed out')
-      }
+        await Promise.race([resumePromise, timeoutPromise])
 
-      // Check if context actually resumed (in some browsers it might "resolve" but still be suspended)
-      if (ctx.state !== 'suspended') {
-        this.isAutoplayBlocked = false
-        this.closeVisualizerDialog()
-        return true
-      } else {
-        // If context is still suspended after "successful" resume, consider it blocked
-        console.warn('Audio context still suspended after resume call - browser is blocking audio')
-        throw new Error('Audio context still suspended after resume call')
-      }
-    } catch (err) {
-      // This will now catch both explicit errors and the timeout
-      this.isAutoplayBlocked = true
-      console.warn(
-        'Audio context could not be resumed due to browser autoplay restrictions:',
-        err instanceof Error ? err.message : String(err)
-      )
-
-      // Show visualizer dialog only if requested and resume failed
-      if (showVisualizerDialogIfBlocked) {
-        // If persistent visualizer is enabled, we don't need to show the dialog
-        // as the visualizer is already visible in the corner
-        if (!this.persistentVisualizer) {
-          this.showVisualizerDialog()
+        // Add null check before accessing state after await
+        if (!this.audioContext) throw new Error('AudioContext became null after resume')
+        if (this.audioContext.state === 'running') {
+          console.log(`AudioContext resumed successfully, state: ${this.audioContext.state}`)
+          this.isAutoplayBlocked = false
+          return { resumed: true, blocked: false }
+        } else {
+          console.warn(
+            `AudioContext still suspended after resume attempt, state: ${this.audioContext.state}. Autoplay likely blocked.`
+          )
+          this.isAutoplayBlocked = true
+          return { resumed: false, blocked: true }
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn(`AudioContext resume failed: ${message}. Autoplay likely blocked.`)
+        this.isAutoplayBlocked = true
+        return { resumed: false, blocked: true }
       }
-
-      return false
     }
+    console.warn(
+      `Cannot resume: AudioContext is in an unexpected state: ${this.audioContext?.state}` // Use optional chaining here
+    )
+    return { resumed: false, blocked: this.isAudioBlocked() }
   }
 
-  /**
-   * Shows the dialog containing the visualizer canvas, informing the user about autoplay restrictions.
-   * Only shown when `persistVisualizer` is true and audio is blocked.
-   */
-  public showVisualizerDialog(): void {
-    // If persistent visualizer is enabled, don't show the dialog
-    if (this.persistentVisualizer) {
-      return
-    }
-
-    // Don't create multiple dialogs
-    if (this.visualizerDialog && this.visualizerDialog.open) {
-      return
-    }
-
-    // Only create dialog in browser environment
-    if (typeof document === 'undefined') return
-
-    // Ensure visualizer is initialized and get the canvas
-    const visualizer = Visualizer.getInstance()
-    if (!visualizer.initialize()) {
-      console.error('Visualizer could not be initialized. Dialog cannot be shown.')
-      return
-    }
-    const visualizerCanvas = visualizer.getCanvasElement()
-    if (!visualizerCanvas) {
-      console.error('Visualizer canvas element not available. Dialog cannot be shown.')
-      return
-    }
-
-    // If dialog exists but isn't open, just show it and ensure canvas is inside
-    if (this.visualizerDialog && !this.visualizerDialog.open) {
-      // Ensure canvas is in the correct container (might have been removed)
-      if (
-        this.visualizerCanvasContainer &&
-        !this.visualizerCanvasContainer.contains(visualizerCanvas)
-      ) {
-        this.visualizerCanvasContainer.appendChild(visualizerCanvas)
-        visualizer.notifyMounted() // Notify visualizer it's back in DOM
-      }
-      this.visualizerDialog.showModal()
-      return
-    }
-
-    // --- Create Dialog Element ---
-    this.visualizerDialog = document.createElement('dialog')
-    this.visualizerDialog.style.cssText = `
-      border: none;
-      border-radius: 8px;
-      padding: 20px; /* Increased padding */
-      background: rgba(30, 30, 40, 0.95); /* Slightly more opaque */
-      color: white;
-      backdrop-filter: blur(5px); /* Increased blur */
-      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.5); /* Increased shadow */
-      z-index: 10000;
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 320px; /* Slightly wider */
-      text-align: center; /* Center align content */
-    `
-    // Prevent closing via Escape key if needed (optional)
-    this.visualizerDialog.addEventListener('cancel', event => event.preventDefault())
-
-    // --- Add Heading ---
-    const heading = document.createElement('h3')
-    heading.textContent = 'Audio Disabled'
-    heading.style.cssText = `
-      margin: 0 0 12px 0;
-      font-size: 18px; /* Larger heading */
-      font-weight: 600;
-      color: #f87171; /* Reddish color for warning */
-    `
-    this.visualizerDialog.appendChild(heading)
-
-    // --- Add Visualizer Canvas ---
-    // Create a container for the canvas
-    this.visualizerCanvasContainer = document.createElement('div')
-    this.visualizerCanvasContainer.style.cssText = `
-        margin-bottom: 16px; /* Space below canvas */
-        height: ${visualizerCanvas.height}px; /* Match canvas height */
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    `
-    // Append the actual canvas to the container
-    this.visualizerCanvasContainer.appendChild(visualizerCanvas)
-    this.visualizerDialog.appendChild(this.visualizerCanvasContainer)
-    // Notify the visualizer instance that its canvas is now in the DOM
-    visualizer.notifyMounted()
-
-    // --- Add Message ---
-    const message = document.createElement('p')
-    message.innerHTML = // Use innerHTML for potential formatting
-      'Audio feedback is currently blocked by your browser. <br/> Click the button below or interact with the page to enable sound.'
-    message.style.cssText = `
-      margin: 0 0 18px 0; /* Increased margin */
-      font-size: 14px;
-      line-height: 1.5; /* Improved line spacing */
-    `
-    this.visualizerDialog.appendChild(message)
-
-    // --- Add Enable Audio Button ---
-    const button = document.createElement('button')
-    button.textContent = 'Enable Audio'
-    button.style.cssText = `
-      background: linear-gradient(to right, #6366f1, #a855f7);
-      border: none;
-      border-radius: 6px; /* Slightly more rounded */
-      color: white;
-      padding: 10px 20px; /* Larger padding */
-      cursor: pointer;
-      font-size: 15px; /* Larger font */
-      font-weight: 600; /* Bolder font */
-      transition: all 0.2s ease-in-out;
-      display: block; /* Make button block */
-      width: 80%; /* Control width */
-      margin: 0 auto 10px auto; /* Center button */
-    `
-    button.addEventListener('mouseover', () => {
-      button.style.transform = 'scale(1.03)' // Scale up slightly
-      button.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.2)'
-    })
-    button.addEventListener('mouseout', () => {
-      button.style.transform = 'scale(1.0)'
-      button.style.boxShadow = 'none'
-    })
-    button.addEventListener('click', async () => {
-      // Attempt to resume audio, passing false to prevent recursive dialog popups
-      const success = await this.tryResumeAudioContext(false)
-      // Dialog is closed automatically within tryResumeAudioContext if successful
-      if (!success) {
-        // Optional: Add feedback if enabling fails (e.g., shake dialog)
-        this.visualizerDialog?.animate(
-          [
-            { transform: 'translateX(-5px)' },
-            { transform: 'translateX(5px)' },
-            { transform: 'translateX(0)' },
-          ],
-          { duration: 300, easing: 'ease-in-out' }
-        )
-      }
-    })
-    this.visualizerDialog.appendChild(button)
-
-    // --- Add Close Button (Manual Dismissal) ---
-    const closeButton = document.createElement('button')
-    closeButton.innerHTML = '&times;' // Use HTML entity for 'x'
-    closeButton.setAttribute('aria-label', 'Close dialog')
-    closeButton.style.cssText = `
-      position: absolute;
-      top: 10px; /* Adjusted position */
-      right: 10px; /* Adjusted position */
-      background: rgba(255, 255, 255, 0.1);
-      border: none;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 24px; /* Larger close icon */
-      cursor: pointer;
-      padding: 0;
-      width: 30px; /* Larger hit area */
-      height: 30px; /* Larger hit area */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.2s;
-      line-height: 1;
-    `
-    closeButton.addEventListener('mouseover', () => {
-      closeButton.style.color = 'white'
-      closeButton.style.background = 'rgba(255, 0, 0, 0.5)' // Red background on hover
-      closeButton.style.transform = 'scale(1.1)'
-    })
-    closeButton.addEventListener('mouseout', () => {
-      closeButton.style.color = 'rgba(255, 255, 255, 0.7)'
-      closeButton.style.background = 'rgba(255, 255, 255, 0.1)'
-      closeButton.style.transform = 'scale(1.0)'
-    })
-    closeButton.addEventListener('click', () => {
-      this.closeVisualizerDialog()
-    })
-    this.visualizerDialog.appendChild(closeButton)
-
-    // Append dialog to document body and show it
-    document.body.appendChild(this.visualizerDialog)
-    this.visualizerDialog.showModal()
-
-    // Add event listener to document to try enabling audio on user interaction
-    // Ensure this listener is only added once if the dialog is re-shown
-    if (!document.body.dataset.zusoundListenerAttached) {
-      document.body.dataset.zusoundListenerAttached = 'true'
-      const userInteractionListener = async (event: Event) => {
-        // Ignore clicks inside the dialog itself
-        if (this.visualizerDialog?.contains(event.target as Node)) {
-          return
-        }
-
-        const success = await this.tryResumeAudioContext(false) // Try enabling audio
-        if (success) {
-          // Dialog is closed by tryResumeAudioContext
-          // Remove the event listeners once we've successfully enabled audio
-          document.removeEventListener('click', userInteractionListener, { capture: true }) // Use capture phase if needed
-          document.removeEventListener('keydown', userInteractionListener, { capture: true })
-          delete document.body.dataset.zusoundListenerAttached // Cleanup flag
-        }
-      }
-
-      // Use capture phase for broader interaction detection if necessary
-      document.addEventListener('click', userInteractionListener, { capture: true, once: false })
-      document.addEventListener('keydown', userInteractionListener, { capture: true, once: false })
-
-      // Store references to remove listeners later if needed during cleanup
-      // (Consider managing these listeners more robustly if issues arise)
-    }
-  }
-
-  /**
-   * Closes the visualizer dialog and cleans up associated resources.
-   */
-  private closeVisualizerDialog(): void {
-    if (this.visualizerDialog) {
-      const visualizer = Visualizer.getInstance()
-      const visualizerCanvas = visualizer.getCanvasElement()
-
-      // Notify visualizer its canvas is being removed from DOM
-      if (visualizerCanvas && this.visualizerDialog.contains(visualizerCanvas)) {
-        visualizer.notifyUnmounted()
-      }
-
-      if (this.visualizerDialog.open) {
-        this.visualizerDialog.close()
-      }
-      if (this.visualizerDialog.parentNode) {
-        this.visualizerDialog.parentNode.removeChild(this.visualizerDialog)
-      }
-      this.visualizerDialog = null
-      this.visualizerCanvasContainer = null // Clear container ref
-
-      // If persistent visualizer is enabled, show it after closing the dialog
-      if (this.persistentVisualizer) {
-        showPersistentVisualizer()
-      }
-    }
-    // Consider removing document-level interaction listeners here if they weren't removed automatically
-    // This might require storing the listener function references
-    // delete document.body.dataset.zusoundListenerAttached; // Ensure flag is cleared
-  }
-
-  /**
-   * Clean up audio resources and visualizer dialog.
-   * @returns Promise that resolves when the context is closed.
-   */
+  /** Clean up audio resources. */
   public async cleanup(): Promise<void> {
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         await this.audioContext.close()
+        console.log('AudioContext closed successfully.')
       } catch (err: unknown) {
         console.warn(
           'Error closing audio context:',
           err instanceof Error ? err.message : String(err)
         )
       } finally {
-        this.audioContext = null // Ensure context is nulled even if close fails
+        this.audioContext = null
       }
     } else {
       this.audioContext = null
     }
+    this.isAutoplayBlocked = false // Reset status on cleanup
 
-    // Close and remove dialog
-    this.closeVisualizerDialog()
-
-    // Disable persistent visualizer if enabled
-    this.setPersistentVisualizer(false)
-
-    // It might be too aggressive to cleanup the Visualizer singleton here,
-    // as other parts of the app might re-initialize it. Let it persist unless
-    // the entire application is shutting down.
+    // No need to clean up Visualizer here, let it persist unless app fully unloads.
     // Visualizer.getInstance().cleanup();
+    // No dialog cleanup needed here
   }
 }
 
-/**
- * Generate a simple hash from a string
- * @param str - The string to hash
- * @returns A positive integer hash value
- */
+// --- simpleHash remains the same ---
+/** Generate a simple hash from a string */
 export const simpleHash = (str: string): number => {
   let hash = 0
   for (let i = 0; i < str.length; i++) {

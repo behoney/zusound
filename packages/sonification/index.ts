@@ -19,7 +19,7 @@
  */
 
 // Core sonification functions
-export { sonifyChanges, playSonicChunk, diffToSonic } from './sonification'
+export { sonifyChanges, playSonicChunk } from './sonification'
 
 // Types
 export type { SonicChunk } from './types'

@@ -1,24 +1,27 @@
 import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
-import type { TraceOptions, DiffResult } from '../core'
+import type { TraceOptions, DiffResult, TraceData } from '../core'
 import { ZusoundOptions } from './types'
 
 /**
  * Interface for zusound middleware options
  */
-export interface ZusoundOptions<T> extends TraceOptions<T> {
+export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
   /** Enable/disable sound feedback (default: true in dev, false in prod) */
   enabled?: boolean
-  /** Log state diffs to console (default: false) */
+  /** Log state diffs to window.__zusound_logger__ (default: false) */
   logDiffs?: boolean
   /** Allow in production (default: false) */
   allowInProduction?: boolean
   /** Optional custom diffing function */
   diffFn?: (prevState: T, nextState: T) => DiffResult<T>
   /**
-   * Enable persistent visualization with dialog when audio is blocked (default: false)
-   * When true, a dialog will appear if browser autoplay policy prevents audio playback,
-   * explaining the situation and providing a button to enable audio.
-   * The visualizer will continue to provide visual feedback even when audio is blocked.
+   * Optional callback executed after sonification for each state change.
+   * Receives trace data (state, diff, duration, etc.).
+   */
+  onTrace?: (traceData: TraceData<T>) => void
+  /**
+   * Show a persistent visualizer UI in the corner of the screen (default: false).
+   * This simply shows/hides the UI element based on this flag.
    */
   persistVisualizer?: boolean
 } /**

@@ -1,7 +1,7 @@
 import { SonicChunk } from './types'
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager, simpleHash } from './utils'
-import { ZusoundEventDetail } from '../visualizer' // Import detail type
+import { ZusoundEventDetail } from '../visualizer'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -105,24 +105,17 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
 }
 
 /**
- * Play a sonic chunk using the Web Audio API
+ * Play a sonic chunk using the Web Audio API.
+ * Dispatches visualization events regardless of playback success.
  * @param chunk - The sonic chunk to play
- * @param persistVisualizer - Whether to show visualizer dialog if audio is blocked
- * @throws Error if Web Audio API is not supported or audio cannot be played
+ * @returns Promise resolving to true if audio playback started, false otherwise.
  */
-export async function playSonicChunk(
-  chunk: SonicChunk,
-  persistVisualizer: boolean = false
-): Promise<void> {
-  // TODO(#11):: long function, refactor this into smaller functions
+export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
   try {
     const audioManager = AudioContextManager.getInstance()
-    // Ensure persistent visualizer setting is consistent
-    audioManager.setPersistentVisualizer(persistVisualizer)
-    const ctx = audioManager.getContext() // Ensures context and Visualizer are initialized
+    const ctx = audioManager.getContext() // Ensures context is ready
 
     // Dispatch custom event for visualizer *before* attempting playback
-    // This ensures visualization happens even if audio is blocked/fails
     if (typeof window !== 'undefined') {
       const event = new CustomEvent<ZusoundEventDetail>('zusound', {
         detail: { chunk },
@@ -130,163 +123,129 @@ export async function playSonicChunk(
       window.dispatchEvent(event)
     }
 
-    // If audio context is suspended (e.g., browser autoplay policy), try to resume it
-    let canPlayAudio = true
-    if (ctx.state === 'suspended') {
-      console.log(`Audio context is suspended before attempting playback for chunk ${chunk.id}`)
-
-      // Try to resume, showing dialog only if persistVisualizer is true AND resume fails
-      try {
-        const resumed = await audioManager.tryResumeAudioContext(persistVisualizer)
-
-        if (!resumed) {
-          // If still suspended after trying, don't attempt to play sound
-          console.warn(
-            `Audio playback skipped for chunk ${chunk.id} - context suspended after resume attempt.`
-          )
-          canPlayAudio = false
-        }
-      } catch (resumeError) {
-        console.error(`Error attempting to resume audio context: ${resumeError}`)
-        canPlayAudio = false
+    // Attempt to resume context if suspended
+    let canPlayAudio = false
+    if (ctx.state === 'running') {
+      canPlayAudio = true
+    } else if (ctx.state === 'suspended') {
+      console.log(`Audio context suspended before playing chunk ${chunk.id}. Attempting resume...`)
+      const { resumed } = await audioManager.tryResumeAudioContext()
+      if (resumed) {
+        canPlayAudio = true
+      } else {
+        console.warn(`Audio playback skipped for chunk ${chunk.id} - context still suspended.`)
+        return false // Indicate audio didn't play
       }
+    } else {
+      console.warn(
+        `Audio context in unexpected state (${ctx.state}) for chunk ${chunk.id}. Cannot play.`
+      )
+      return false // Cannot play in closed or other states
     }
 
-    // Double-check the audio context state
-    if (ctx.state === 'suspended') {
-      console.warn(`Audio context still suspended after resume attempt for chunk ${chunk.id}`)
-      canPlayAudio = false
-
-      // Show visualizer dialog if requested and not already showing
-      if (persistVisualizer) {
-        audioManager.showVisualizerDialog()
-      }
-    }
-
-    // Only proceed with audio playback if the context is running
+    // Only proceed if context is running
     if (canPlayAudio && ctx.state === 'running') {
-      // --- Audio Playback Logic ---
       const now = ctx.currentTime
-      const duration = chunk.duration / 1000 // Convert to seconds
+      const duration = chunk.duration / 1000 // Convert ms to seconds
 
-      // Create and configure oscillator
       const oscillator = ctx.createOscillator()
       oscillator.type = chunk.type
-      // Use setValueAtTime for frequency and detune to ensure they are set correctly
-      // even if the context was just resumed. Using .value might fail in some browsers.
       oscillator.frequency.setValueAtTime(chunk.frequency, now)
-      oscillator.detune.setValueAtTime(chunk.detune, now) // Apply detuning
+      oscillator.detune.setValueAtTime(chunk.detune, now)
 
-      // Create gain node with envelope
       const gainNode = ctx.createGain()
-      gainNode.gain.setValueAtTime(0, now) // Start silent
-
-      // Connect nodes
+      gainNode.gain.setValueAtTime(0, now)
       oscillator.connect(gainNode)
       gainNode.connect(ctx.destination)
 
-      // Calculate envelope timings
       const attackTime = Math.min(0.01, duration * 0.2)
       const releaseTime = Math.min(0.08, duration * 0.3)
-      const sustainDuration = Math.max(0, duration - attackTime - releaseTime) // Ensure non-negative sustain
+      const sustainDuration = Math.max(0, duration - attackTime - releaseTime)
 
-      // Apply envelope
       if (duration > 0.02) {
-        // Standard envelope for longer sounds
         gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
-        // Sustain phase: hold the magnitude
         if (sustainDuration > 0.001) {
-          // Add a small threshold for sustain phase
           gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainDuration)
         }
-        // Release phase
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
       } else {
-        // Simple linear ramp for very short clicks/sounds
         gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
         gainNode.gain.linearRampToValueAtTime(0, now + duration)
       }
 
-      // Schedule oscillator start and stop
       oscillator.start(now)
       oscillator.stop(now + duration)
 
-      // Setup cleanup for when the sound finishes *playing*
-      // Use a promise to wait for onended or timeout
+      // Cleanup promise with timeout safety
       await new Promise<void>(resolve => {
         let resolved = false
-        oscillator.onended = () => {
-          if (!resolved) {
-            oscillator.disconnect()
-            gainNode.disconnect()
-            resolved = true
-            resolve()
-          }
-        }
-        // Add a safety timeout slightly longer than duration, in case onended doesn't fire
-        setTimeout(
+        const timeoutId = setTimeout(
           () => {
             if (!resolved) {
-              console.warn(
-                `Oscillator onended for chunk ${chunk.id} did not fire within expected time.`
-              )
+              console.warn(`Oscillator onended for chunk ${chunk.id} timed out. Force cleaning up.`)
               try {
                 oscillator.disconnect()
                 gainNode.disconnect()
-              } catch (e) {
-                /* Ignore errors if already disconnected */
-                console.error(`Error disconnecting oscillator for chunk ${chunk.id}:`, e)
+              } catch {
+                /* ignore */
               }
               resolved = true
               resolve()
             }
           },
-          duration * 1000 + 100
-        ) // duration is already in sec, convert back to ms + buffer
+          duration * 1000 + 150
+        )
+
+        oscillator.onended = () => {
+          if (!resolved) {
+            clearTimeout(timeoutId)
+            try {
+              oscillator.disconnect()
+              gainNode.disconnect()
+            } catch {
+              /* ignore */
+            }
+            resolved = true
+            resolve()
+          }
+        }
       })
+      return true // Audio playback initiated
     }
+
+    return false // Audio did not play
   } catch (err) {
-    // Log errors related to audio playback setup or execution
     const message = err instanceof Error ? err.message : String(err)
-    console.error(`Failed to play audio for chunk ${chunk.id}:`, message)
-    // Don't re-throw here to allow other sounds in the sequence to potentially play
+    console.error(`Failed to prepare audio for chunk ${chunk.id}:`, message)
+    return false // Indicate audio setup/playback failed
   }
 }
 
 /**
- * Play a sonic representation of state changes
- * @param diff - The object containing state changes to sonify
- * @param duration - Base duration for each sonic chunk in milliseconds
- * @param persistVisualizer - Whether to show visualizer dialog if audio is blocked
+ * Generates sonic chunks and plays them.
+ * Visualizer listens independently via dispatched events.
+ * @param diff - State changes
+ * @param duration - Sound duration
+ * @param _persistVisualizer - No longer used for UI control, kept for potential future options
  */
 export function sonifyChanges<T>(
   diff: Partial<T>,
   duration: number,
-  persistVisualizer: boolean = false
+  _persistVisualizer: boolean = false // Parameter kept for signature compatibility, but unused
 ): void {
   try {
-    // Set the persistent visualizer flag on the AudioContextManager
-    const audioManager = AudioContextManager.getInstance()
-    audioManager.setPersistentVisualizer(persistVisualizer)
-
     const chunks = diffToSonic(diff, duration)
+    if (chunks.length === 0) return
 
-    if (chunks.length === 0) {
-      return
-    }
-
-    // Use staggered playback for clearer auditory perception
+    // Stagger playback
     chunks.forEach((chunk, index) => {
       setTimeout(() => {
-        // No need for inner try/catch as playSonicChunk handles its errors now
-        playSonicChunk(chunk, persistVisualizer).catch(err => {
-          // This catch is unlikely to be hit now, but kept for safety
+        playSonicChunk(chunk).catch(err => {
           console.error(`Error during scheduled playback for chunk ${chunk.id}:`, err)
         })
       }, index * AUDIO_CONFIG.STAGGER_DELAY_MS)
     })
   } catch (err: unknown) {
-    // Catch synchronous errors (e.g., from diffToSonic)
     console.error('Sonification setup failed:', err instanceof Error ? err.message : String(err))
   }
 }
