@@ -76,7 +76,7 @@ const useImmerCounterStore = create<CounterState>()(
         set(state => {
           state.count = 0
         }),
-    })),
+    }))
   )
 )
 
@@ -95,7 +95,8 @@ const usePersistCounterStore = create<CounterState>()(
       {
         name: 'persist-counter-storage', // Unique name for storage
       }
-    ))
+    )
+  )
 )
 
 // Store using Devtools middleware + zusound
