@@ -20,8 +20,8 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "rimraf dist && tsc -p tsconfig.build.json && vite build && npm run copy-dts",
-    "copy-dts": "cp packages/index.d.ts dist/index.d.ts",
+    "build": "rimraf dist && tsup",
+    "build:prod": "NODE_ENV=production bun run build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "preview": "vite preview",
@@ -30,7 +30,7 @@
     "test:coverage": "vitest run --coverage",
     "build:examples": "tsc -b && vite build -c vite.examples.config.ts",
     "deploy:examples": "bun run build:examples && gh-pages -d dist",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "bun run build:prod"
   },
   "keywords": [
     "zustand",
@@ -48,6 +48,7 @@
   },
   "homepage": "https://www.npmjs.com/package/zusound",
   "dependencies": {
+    "tsup": "^8.4.0",
     "zustand": "^5.0.3"
   },
   "peerDependencies": {

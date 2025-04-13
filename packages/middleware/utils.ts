@@ -8,8 +8,11 @@ export const isProduction = (): boolean => {
     return true
   }
 
-  // Check for Vite's import.meta.env (will be replaced at build time)
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD === true) {
+  // Safe check for Vite's import.meta.env (for ESM only)
+  // This will be handled by tsup define replacements
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globalObj: any = typeof globalThis !== 'undefined' ? globalThis : {}
+  if (globalObj?.import?.meta?.env?.PROD === true) {
     return true
   }
 
