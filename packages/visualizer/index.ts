@@ -6,10 +6,10 @@
 // And it will 64*64 pixel size visualizer. and it will be better when we maximize to utilize the WebGL Shaders.
 
 // Visualizer for sonification events
-// A small 64x64 pixel WebGL-based visualizer that sits in the top-right corner
-// of the application and visualizes sonification events.
+// A small 64x64 pixel WebGL-based visualizer, intended to be embedded within
+// the autoplay warning dialog.
 
-import type { SonicChunk } from '../index'
+import type { SonicChunk } from '../sonification' // Adjusted import path
 import type { ZusoundEvent } from './types'
 
 // Export types
@@ -40,7 +40,7 @@ class VisualizerShaderManager {
   private vertexBuffer: WebGLBuffer | null = null
   private events: VisualizerEvent[] = []
   private animationFrameId: number | null = null
-  private containerElement: HTMLElement | null = null
+  private isMounted = false // Track if canvas is in the DOM
 
   // Vertex shader source (positions for a full-screen quad)
   private vertexShaderSource = `
@@ -153,21 +153,26 @@ class VisualizerShaderManager {
     this.canvas = document.createElement('canvas')
     this.canvas.width = VISUALIZER_SIZE
     this.canvas.height = VISUALIZER_SIZE
-
-    // Style the canvas for a top-right floating visualizer
-    this.canvas.style.position = 'fixed'
-    this.canvas.style.top = '16px'
-    this.canvas.style.right = '16px'
-    this.canvas.style.zIndex = '1000'
+    // Style the canvas for use within the dialog
     this.canvas.style.borderRadius = '50%'
-    this.canvas.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)'
-    this.canvas.style.pointerEvents = 'none' // Don't block mouse events
+    this.canvas.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)'
+    this.canvas.style.display = 'block' // Ensure it takes block layout space
+    this.canvas.style.margin = '0 auto 16px auto' // Center horizontally, add bottom margin
+  }
+
+  /**
+   * Returns the canvas element managed by this instance.
+   */
+  public getCanvasElement(): HTMLCanvasElement {
+    return this.canvas
   }
 
   /**
    * Initializes the WebGL context and shader program
    */
   public initialize(): boolean {
+    if (this.gl) return true // Already initialized
+
     try {
       // Get WebGL context
       this.gl = this.canvas.getContext('webgl')
@@ -289,35 +294,25 @@ class VisualizerShaderManager {
   }
 
   /**
-   * Mount the visualizer canvas to the document
+   * Indicate that the visualizer canvas has been mounted to the DOM.
+   * Starts the render loop.
    */
-  public mount(container?: HTMLElement): void {
-    if (container) {
-      container.appendChild(this.canvas)
-      this.containerElement = container
-    } else {
-      document.body.appendChild(this.canvas)
-    }
-
-    // Start the render loop
+  public notifyMounted(): void {
+    this.isMounted = true
     this.startRenderLoop()
   }
 
   /**
-   * Unmount the visualizer canvas from the document
+   * Indicate that the visualizer canvas has been removed from the DOM.
+   * Stops the render loop.
    */
-  public unmount(): void {
+  public notifyUnmounted(): void {
+    this.isMounted = false
     this.stopRenderLoop()
-
-    if (this.containerElement && this.containerElement.contains(this.canvas)) {
-      this.containerElement.removeChild(this.canvas)
-    } else if (document.body.contains(this.canvas)) {
-      document.body.removeChild(this.canvas)
-    }
   }
 
   /**
-   * Add a sound event to the visualizer
+   * Add a sound event to the visualizer queue
    */
   public addEvent(chunk: SonicChunk): void {
     const now = performance.now()
@@ -336,17 +331,32 @@ class VisualizerShaderManager {
     if (this.events.length > MAX_VISIBLE_EVENTS) {
       this.events.shift() // Remove oldest event
     }
+
+    // Ensure render loop is running if mounted
+    if (this.isMounted) {
+      this.startRenderLoop()
+    }
   }
 
   /**
-   * Start the render loop
+   * Start the render loop if not already running
    */
   private startRenderLoop(): void {
-    if (this.animationFrameId !== null) return
+    if (this.animationFrameId !== null || !this.isMounted) return
 
     const renderFrame = () => {
+      // Check if still mounted before rendering
+      if (!this.isMounted) {
+        this.animationFrameId = null // Stop loop if unmounted
+        return
+      }
       this.render()
-      this.animationFrameId = requestAnimationFrame(renderFrame)
+      // Continue loop only if there are active events or potentially new ones coming
+      if (this.events.length > 0 || this.isMounted) {
+        this.animationFrameId = requestAnimationFrame(renderFrame)
+      } else {
+        this.animationFrameId = null // Stop if no events and unmounted
+      }
     }
 
     this.animationFrameId = requestAnimationFrame(renderFrame)
@@ -366,62 +376,118 @@ class VisualizerShaderManager {
    * Render the current state of the visualizer
    */
   private render(): void {
-    if (!this.gl || !this.program) return
-
-    // Clear the canvas
-    this.gl.clearColor(0, 0, 0, 0)
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+    // Don't render if not initialized or not mounted
+    if (!this.gl || !this.program || !this.isMounted) return
 
     // Filter out completed events
     this.events = this.events.filter(event => event.getProgress() < 1)
 
+    // If no events left, potentially stop rendering? Or keep background? Let's keep background.
+    // if (this.events.length === 0) {
+    //   // Optionally clear or just draw background?
+    //   // this.stopRenderLoop(); // Maybe stop loop if no events? Let's keep it running for now.
+    //   // return;
+    // }
+
+    // Clear the canvas (important for transparency if container is styled)
+    this.gl.clearColor(0, 0, 0, 0) // Use transparent clear color
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+
+    // Ensure the program is active
+    this.gl.useProgram(this.program)
+    // Bind vertex buffer
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer)
+    const positionAttrib = this.gl.getAttribLocation(this.program, 'a_position')
+    this.gl.enableVertexAttribArray(positionAttrib)
+    this.gl.vertexAttribPointer(positionAttrib, 2, this.gl.FLOAT, false, 0, 0)
+
     // Update uniforms with event data
     this.gl.uniform1i(this.uniforms.u_eventCount, this.events.length)
 
-    for (let i = 0; i < this.events.length; i++) {
-      const event = this.events[i]
-      const progress = event.getProgress()
-      const chunk = event.chunk
+    for (let i = 0; i < MAX_VISIBLE_EVENTS; i++) {
+      if (i < this.events.length) {
+        const event = this.events[i]
+        const progress = event.getProgress()
+        const chunk = event.chunk
 
-      // Wave type mapping: sine=0, square=1, sawtooth=2, triangle=3
-      const typeMapping: Record<SonicChunk['type'], number> = {
-        sine: 0,
-        square: 1,
-        sawtooth: 2,
-        triangle: 3,
+        // Wave type mapping: sine=0, square=1, sawtooth=2, triangle=3
+        const typeMapping: Record<SonicChunk['type'], number> = {
+          sine: 0,
+          square: 1,
+          sawtooth: 2,
+          triangle: 3,
+        }
+
+        // Value type mapping: add=0, remove=1, change=2
+        const valueTypeMapping: Record<SonicChunk['valueType'], number> = {
+          add: 0, // 'add' isn't used currently, maps to 'change' in diffToSonic
+          remove: 1,
+          change: 2,
+        }
+
+        // Set uniform values for this event
+        this.gl.uniform1f(this.uniforms[`u_eventProgress[${i}]`], progress)
+        this.gl.uniform1f(this.uniforms[`u_eventFrequency[${i}]`], chunk.frequency)
+        this.gl.uniform1f(this.uniforms[`u_eventMagnitude[${i}]`], chunk.magnitude)
+        this.gl.uniform1f(this.uniforms[`u_eventDetune[${i}]`], chunk.detune)
+        this.gl.uniform1i(this.uniforms[`u_eventType[${i}]`], typeMapping[chunk.type])
+        this.gl.uniform1i(
+          this.uniforms[`u_eventValueType[${i}]`],
+          valueTypeMapping[chunk.valueType]
+        )
+      } else {
+        // Optionally clear uniforms for slots beyond the current event count, although shader logic handles this
+        this.gl.uniform1f(this.uniforms[`u_eventProgress[${i}]`], 1.0) // Mark as inactive
       }
-
-      // Value type mapping: add=0, remove=1, change=2
-      const valueTypeMapping: Record<SonicChunk['valueType'], number> = {
-        add: 0,
-        remove: 1,
-        change: 2,
-      }
-
-      // Set uniform values for this event
-      this.gl.uniform1f(this.uniforms[`u_eventProgress[${i}]`], progress)
-      this.gl.uniform1f(this.uniforms[`u_eventFrequency[${i}]`], chunk.frequency)
-      this.gl.uniform1f(this.uniforms[`u_eventMagnitude[${i}]`], chunk.magnitude)
-      this.gl.uniform1f(this.uniforms[`u_eventDetune[${i}]`], chunk.detune)
-      this.gl.uniform1i(this.uniforms[`u_eventType[${i}]`], typeMapping[chunk.type])
-      this.gl.uniform1i(this.uniforms[`u_eventValueType[${i}]`], valueTypeMapping[chunk.valueType])
     }
 
     // Draw the quad
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4)
   }
+
+  /**
+   * Clean up WebGL resources.
+   */
+  public cleanup(): void {
+    this.stopRenderLoop()
+    if (this.gl) {
+      if (this.program) {
+        // Detach shaders? Delete shaders? Delete program?
+        // For simplicity, just losing the context might be enough if the page navigates away.
+        // If needing robust cleanup within a single page app:
+        // this.gl.deleteProgram(this.program);
+        // this.gl.deleteBuffer(this.vertexBuffer);
+        // TODO: Delete shaders if stored
+      }
+      // Attempt to lose the context
+      const loseContextExt = this.gl.getExtension('WEBGL_lose_context')
+      if (loseContextExt) {
+        loseContextExt.loseContext()
+      }
+    }
+    this.gl = null
+    this.program = null
+    this.vertexBuffer = null
+    this.events = []
+    this.isMounted = false
+  }
 }
 
 /**
- * Visualizer singleton instance
+ * Visualizer singleton instance manager
  */
 export class Visualizer {
   private static instance: Visualizer | null = null
   private shaderManager: VisualizerShaderManager | null = null
   private isInitialized = false
+  private eventListenerAttached = false
 
   private constructor() {
     // Private constructor for singleton
+    if (typeof window !== 'undefined') {
+      // Ensure event listener is attached only once
+      this.attachEventListener()
+    }
   }
 
   /**
@@ -435,10 +501,16 @@ export class Visualizer {
   }
 
   /**
-   * Initialize the visualizer
+   * Initialize the visualizer's shader manager
    */
   public initialize(): boolean {
     if (this.isInitialized) return true
+
+    // Ensure we are in a browser environment
+    if (typeof window === 'undefined') {
+      console.warn('Visualizer cannot initialize outside a browser environment.')
+      return false
+    }
 
     try {
       this.shaderManager = new VisualizerShaderManager()
@@ -446,88 +518,127 @@ export class Visualizer {
 
       if (success) {
         this.isInitialized = true
+        this.attachEventListener() // Ensure listener is attached post-initialization
         return true
       } else {
         console.error('Failed to initialize visualizer shader manager')
+        this.shaderManager = null // Clean up partially initialized manager
         return false
       }
     } catch (err) {
       console.error('Error initializing visualizer:', err)
+      this.shaderManager = null
       return false
     }
   }
 
   /**
-   * Mount the visualizer to the DOM
+   * Returns the visualizer canvas element if initialized.
    */
-  public mount(container?: HTMLElement): void {
+  public getCanvasElement(): HTMLCanvasElement | null {
     if (!this.isInitialized && !this.initialize()) {
-      console.error('Cannot mount visualizer: not initialized')
-      return
+      return null
     }
-
-    this.shaderManager?.mount(container)
+    return this.shaderManager?.getCanvasElement() ?? null
   }
 
   /**
-   * Unmount the visualizer from the DOM
+   * Notify the shader manager that the canvas has been mounted to the DOM.
    */
-  public unmount(): void {
-    this.shaderManager?.unmount()
+  public notifyMounted(): void {
+    this.shaderManager?.notifyMounted()
   }
 
   /**
-   * Visualize a sound event
+   * Notify the shader manager that the canvas has been unmounted from the DOM.
    */
-  public visualizeEvent(chunk: SonicChunk): void {
-    if (!this.isInitialized && !this.initialize()) {
-      return
-    }
+  public notifyUnmounted(): void {
+    this.shaderManager?.notifyUnmounted()
+  }
 
-    this.shaderManager?.addEvent(chunk)
+  /**
+   * Clean up visualizer resources.
+   */
+  public cleanup(): void {
+    this.shaderManager?.cleanup()
+    this.detachEventListener()
+    this.isInitialized = false
+    this.shaderManager = null
+    // Don't reset Visualizer.instance, allow re-initialization if needed
+  }
+
+  /**
+   * Handles incoming 'zusound' events.
+   */
+  private handleSonificationEvent = (event: Event) => {
+    // Check if it's the custom event we expect
+    if ('detail' in event && (event as ZusoundEvent).detail?.chunk) {
+      const customEvent = event as ZusoundEvent
+      if (this.isInitialized && this.shaderManager) {
+        this.shaderManager.addEvent(customEvent.detail.chunk)
+      } else {
+        // Initialize on first event if not already done
+        if (this.initialize() && this.shaderManager) {
+          this.shaderManager.addEvent(customEvent.detail.chunk)
+        }
+      }
+    }
+  }
+
+  /**
+   * Attaches the global event listener if not already attached.
+   */
+  private attachEventListener(): void {
+    if (this.eventListenerAttached || typeof window === 'undefined') return
+
+    window.addEventListener('zusound', this.handleSonificationEvent)
+    this.eventListenerAttached = true
+  }
+
+  /**
+   * Detaches the global event listener.
+   */
+  private detachEventListener(): void {
+    if (!this.eventListenerAttached || typeof window === 'undefined') return
+
+    window.removeEventListener('zusound', this.handleSonificationEvent)
+    this.eventListenerAttached = false
   }
 }
 
 /**
- * Manually visualize a sonic chunk
- * This is an alternative way to trigger visualizations directly without the event system
+ * Manually visualize a sonic chunk (useful for testing or direct calls)
  * @param chunk - The sonic chunk to visualize
  */
 export function visualizeSonicChunk(chunk: SonicChunk): void {
-  Visualizer.getInstance().visualizeEvent(chunk)
+  Visualizer.getInstance().initialize() // Ensure initialized
+  // The event listener handles adding the chunk, manually adding is redundant now.
+  // Visualizer.getInstance().shaderManager?.addEvent(chunk); // Direct add if needed
+  // Dispatch event instead to use the standard flow
+  if (typeof window !== 'undefined') {
+    const event = new CustomEvent<ZusoundEventDetail>('zusound', {
+      detail: { chunk },
+    })
+    window.dispatchEvent(event)
+  }
 }
 
 /**
- * Initialize the visualizer component and mount it to the DOM
- * @param container - Optional container element to mount the visualizer in
- * @returns A function to unmount the visualizer
+ * Ensures the visualizer is initialized and listening for events.
+ * No longer mounts anything by default. Call this early in your app setup.
+ * Returns a cleanup function.
  */
-export function initializeVisualizer(container?: HTMLElement): () => void {
+export function initializeVisualizer(): () => void {
   const visualizer = Visualizer.getInstance()
   visualizer.initialize()
-  visualizer.mount(container)
 
-  // Set up event listener for sonification events
-  const handleSonificationEvent = (event: ZusoundEvent) => {
-    if (event.detail && event.detail.chunk) {
-      visualizer.visualizeEvent(event.detail.chunk)
-    }
-  }
-
-  // Add event listener
-  if (typeof window !== 'undefined') {
-    window.addEventListener('zusound', handleSonificationEvent)
-  }
-
-  // Return unmount function that also removes the event listener
+  // Return cleanup function
   return () => {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('zusound', handleSonificationEvent)
-    }
-    visualizer.unmount()
+    // The cleanup method handles detaching listener now
+    // visualizer.cleanup(); // Don't cleanup singleton fully here maybe?
   }
 }
 
-// Export the React component
-export { Visualizer as VisualizerComponent } from './VisualizerComponent'
-export { default as VisualizerReact } from './VisualizerComponent'
+// Remove React component exports
+// export { Visualizer as VisualizerComponent } from './VisualizerComponent'
+// export { default as VisualizerReact } from './VisualizerComponent'

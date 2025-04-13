@@ -48,10 +48,6 @@ export interface TraceOptions<T> {
    * Defaults to the `calculateDiff` function from the diff package.
    */
   diffFn?: (prevState: T, nextState: T) => DiffResult<T>
-  /**
-   * Name to identify this store instance in traces, useful if multiple stores use the middleware.
-   */
-  name?: string
 }
 
 /** Public type signature for the trace middleware function. */

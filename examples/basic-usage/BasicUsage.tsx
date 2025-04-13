@@ -25,7 +25,6 @@ const useCountStore = create<CountState>()(
       count: 0,
       increment: () => set(state => ({ count: state.count + 1 })),
     }),
-    { name: 'CounterStore' } // Add name for clarity
   )
 )
 

@@ -77,7 +77,6 @@ const useImmerCounterStore = create<CounterState>()(
           state.count = 0
         }),
     })),
-    { name: 'ImmerStore' } // zusound options
   )
 )
 
@@ -96,9 +95,7 @@ const usePersistCounterStore = create<CounterState>()(
       {
         name: 'persist-counter-storage', // Unique name for storage
       }
-    ),
-    { name: 'PersistStore' } // zusound options
-  )
+    ))
 )
 
 // Store using Devtools middleware + zusound
@@ -114,8 +111,7 @@ const useDevtoolsCounterStore = create<CounterState>()(
         reset: () => set(() => ({ count: 0 }), false, 'RESET'),
       }),
       { name: 'DevtoolsCounterStore' } // Name for devtools extension
-    ),
-    { name: 'DevtoolsStore' } // Name for zusound (optional but good practice)
+    )
   )
 )
 
@@ -149,8 +145,7 @@ const useMixedCounterStore = create<CounterState>()(
         }
       ),
       { name: 'MixedCounterStoreDevtools' } // Name for devtools extension
-    ),
-    { name: 'MixedStore' } // Name for zusound
+    )
   )
 )
 

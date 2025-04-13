@@ -101,7 +101,7 @@ const useTodoStore = create<TodoState>()(
         }
       },
     }),
-    { name: 'TodoStore', logDiffs: true }
+    { logDiffs: true }
   )
 )
 
@@ -116,8 +116,7 @@ const useFilterStore = create<FilterState>()(
     set => ({
       filter: 'all',
       setFilter: filter => set({ filter }),
-    }),
-    { name: 'FilterStore' }
+    })
   )
 )
 
@@ -132,8 +131,7 @@ const useInputStore = create<InputState>()(
     set => ({
       inputValue: '',
       setInputValue: value => set({ inputValue: value }),
-    }),
-    { name: 'InputStore' }
+    })
   )
 )
 
@@ -152,8 +150,7 @@ const useTimeStore = create<TimeState>()(
         second: '2-digit',
       }),
       setCurrentTime: time => set({ currentTime: time }),
-    }),
-    { name: 'TimeStore' }
+    })
   )
 )
 
