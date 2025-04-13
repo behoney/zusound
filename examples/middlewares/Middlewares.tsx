@@ -3,8 +3,8 @@ import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
 import { zusound } from '../../packages'
-import { CodeViewer } from '../CodeViewer'; // Import the CodeViewer
-import middlewaresSource from './Middlewares.tsx?raw'; // Import raw source code
+import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
+import middlewaresSource from './Middlewares.tsx?raw' // Import raw source code
 
 // Define the store state interface
 interface CounterState {
@@ -59,8 +59,10 @@ function CounterUI({
 // Store using Immer middleware + zusound
 // zusound should generally wrap the other middlewares.
 const useImmerCounterStore = create<CounterState>()(
-  zusound( // Outer: zusound intercepts final state changes
-    immer(set => ({ // Inner: Immer handles draft mutations
+  zusound(
+    // Outer: zusound intercepts final state changes
+    immer(set => ({
+      // Inner: Immer handles draft mutations
       count: 0,
       increment: () =>
         set(state => {
@@ -81,8 +83,10 @@ const useImmerCounterStore = create<CounterState>()(
 
 // Store using Persist middleware + zusound
 const usePersistCounterStore = create<CounterState>()(
-  zusound( // Outer: zusound intercepts final state changes
-    persist( // Inner: Persist handles storage
+  zusound(
+    // Outer: zusound intercepts final state changes
+    persist(
+      // Inner: Persist handles storage
       set => ({
         count: 0,
         increment: () => set(state => ({ count: state.count + 1 })),
@@ -99,8 +103,10 @@ const usePersistCounterStore = create<CounterState>()(
 
 // Store using Devtools middleware + zusound
 const useDevtoolsCounterStore = create<CounterState>()(
-  zusound( // Outer: zusound intercepts final state changes
-    devtools( // Inner: Devtools connects to browser extension
+  zusound(
+    // Outer: zusound intercepts final state changes
+    devtools(
+      // Inner: Devtools connects to browser extension
       set => ({
         count: 0,
         increment: () => set(state => ({ count: state.count + 1 }), false, 'INCREMENT'), // Add action names for Devtools
@@ -116,10 +122,14 @@ const useDevtoolsCounterStore = create<CounterState>()(
 // Store using a mix of middlewares + zusound
 // Order matters: zusound -> devtools -> persist -> immer
 const useMixedCounterStore = create<CounterState>()(
-  zusound( // Outermost: zusound intercepts final changes
-    devtools( // Next: Devtools logs actions/state
-      persist( // Next: Persist saves/loads state
-        immer(set => ({ // Innermost: Immer handles state mutations
+  zusound(
+    // Outermost: zusound intercepts final changes
+    devtools(
+      // Next: Devtools logs actions/state
+      persist(
+        // Next: Persist saves/loads state
+        immer(set => ({
+          // Innermost: Immer handles state mutations
           count: 0,
           increment: () =>
             set(state => {
@@ -157,12 +167,16 @@ function Middlewares() {
     <div>
       <h1>Zustand Middleware Examples</h1>
       <p className="text-gray-600 mb-6">
-        This demonstrates using `zusound` alongside other popular Zustand middlewares: `immer`, `persist`, and `devtools`.
-        `zusound` should generally be placed as the outermost middleware to capture the final state changes after other middlewares have processed them.
-        Interact with each counter to hear sounds and observe the specific effects of each middleware stack (e.g., check Redux DevTools, refresh the page for persist).
+        This demonstrates using `zusound` alongside other popular Zustand middlewares: `immer`,
+        `persist`, and `devtools`. `zusound` should generally be placed as the outermost middleware
+        to capture the final state changes after other middlewares have processed them. Interact
+        with each counter to hear sounds and observe the specific effects of each middleware stack
+        (e.g., check Redux DevTools, refresh the page for persist).
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"> {/* Added mb-6 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {' '}
+        {/* Added mb-6 */}
         {/* Immer Counter */}
         <CounterUI
           title="zusound(immer(...))"
@@ -172,7 +186,6 @@ function Middlewares() {
           onDecrement={immerState.decrement}
           onReset={immerState.reset}
         />
-
         {/* Persist Counter */}
         <CounterUI
           title="zusound(persist(...))"
@@ -182,7 +195,6 @@ function Middlewares() {
           onDecrement={persistState.decrement}
           onReset={persistState.reset}
         />
-
         {/* Devtools Counter */}
         <CounterUI
           title="zusound(devtools(...))"
@@ -192,7 +204,6 @@ function Middlewares() {
           onDecrement={devtoolsState.decrement}
           onReset={devtoolsState.reset}
         />
-
         {/* Mixed Counter */}
         <CounterUI
           title="zusound(devtools(persist(immer(...))))"

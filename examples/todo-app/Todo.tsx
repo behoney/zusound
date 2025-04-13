@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { create } from 'zustand'
 import { zusound } from '../../packages' // Adjust the import path if necessary
-import { CodeViewer } from '../CodeViewer'; // Import the CodeViewer
-import todoSource from './Todo.tsx?raw'; // Import raw source code
+import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
+import todoSource from './Todo.tsx?raw' // Import raw source code
 
 // --- Types ---
 interface Todo {
@@ -86,7 +86,8 @@ const useTodoStore = create<TodoState>()(
         } finally {
           // Ensure sorting flag is reset even if an error occurs (unlikely here)
           // or if sorting completes naturally or is stopped
-          if (get().isSorting) { // Only set final state if sorting wasn't cancelled
+          if (get().isSorting) {
+            // Only set final state if sorting wasn't cancelled
             const finalSorted = [...get().todos].sort((a, b) => {
               if (order === 'asc') return a.id - b.id
               return b.id - a.id
@@ -177,7 +178,8 @@ function TimeDisplay() {
 
   return (
     <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2 text-gray-600 text-sm mb-4">
-      Current Time: <strong className="font-mono">{currentTime}</strong> (This demonstrates an unrelated store update triggering its own sound.)
+      Current Time: <strong className="font-mono">{currentTime}</strong> (This demonstrates an
+      unrelated store update triggering its own sound.)
     </div>
   )
 }
@@ -224,8 +226,9 @@ function TodoItem({ todo }: TodoItemProps) {
 
   return (
     <li
-      className={`flex items-center py-3 border-b border-gray-200 last:border-b-0 ${todo.completed ? 'opacity-60' : ''
-        }`}
+      className={`flex items-center py-3 border-b border-gray-200 last:border-b-0 ${
+        todo.completed ? 'opacity-60' : ''
+      }`}
     >
       <input
         type="checkbox"
@@ -266,12 +269,16 @@ function TodoList() {
       <div className="card-body">
         <h2 className="card-title !mt-0">Tasks</h2> {/* Use !mt-0 to override default */}
         {isSorting && (
-          <div className="text-sm text-blue-600 mb-2 animate-pulse">Sorting... (Notice the rapid sounds from frequent state updates)</div>
+          <div className="text-sm text-blue-600 mb-2 animate-pulse">
+            Sorting... (Notice the rapid sounds from frequent state updates)
+          </div>
         )}
         {filteredTodos.length === 0 && !isSorting ? (
           <p className="text-gray-500">No tasks here. Add one above!</p>
         ) : (
-          <ul className="divide-y divide-gray-200"> {/* Add divider within ul */}
+          <ul className="divide-y divide-gray-200">
+            {' '}
+            {/* Add divider within ul */}
             {filteredTodos.map(todo => (
               <TodoItem key={todo.id} todo={todo} />
             ))}
@@ -293,28 +300,29 @@ function Controls() {
 
   const handleSort = (order: 'asc' | 'desc') => {
     if (isSorting && sortOrder === order) {
-      stopSorting(); // Stop sorting if the same sort button is clicked again
+      stopSorting() // Stop sorting if the same sort button is clicked again
     } else if (!isSorting) {
-      sortTodos(order); // Start sorting if not already sorting
+      sortTodos(order) // Start sorting if not already sorting
     }
     // Do nothing if sorting a different order
   }
 
   const getFilterButtonStyle = (controlFilter: Filter) =>
-    `btn text-xs sm:text-sm ${filter === controlFilter
-      ? 'btn-primary'
-      : 'btn-outline hover:bg-gray-100'
+    `btn text-xs sm:text-sm ${
+      filter === controlFilter ? 'btn-primary' : 'btn-outline hover:bg-gray-100'
     }`
 
   const getSortButtonStyle = (controlOrder: SortOrder) =>
-    `btn text-xs sm:text-sm ${sortOrder === controlOrder && !isSorting
-      ? 'btn-secondary' // Indicate active sort order when not currently sorting
-      : 'btn-outline hover:bg-gray-100'
+    `btn text-xs sm:text-sm ${
+      sortOrder === controlOrder && !isSorting
+        ? 'btn-secondary' // Indicate active sort order when not currently sorting
+        : 'btn-outline hover:bg-gray-100'
     } ${isSorting && sortOrder === controlOrder ? 'bg-yellow-200 text-yellow-800 border-yellow-300 animate-pulse' : ''}`
 
-
   return (
-    <div className="card mb-6"> {/* Added mb-6 for spacing */}
+    <div className="card mb-6">
+      {' '}
+      {/* Added mb-6 for spacing */}
       <div className="card-body space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-sm mr-2">Show:</span>
@@ -351,7 +359,12 @@ function Controls() {
             Newest First {isSorting && sortOrder === 'desc' ? '(Sorting...)' : ''}
           </button>
           {isSorting && (
-            <button onClick={stopSorting} className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 text-xs sm:text-sm">Stop Sort</button>
+            <button
+              onClick={stopSorting}
+              className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 text-xs sm:text-sm"
+            >
+              Stop Sort
+            </button>
           )}
         </div>
       </div>
@@ -365,9 +378,12 @@ export function TodoApp() {
     <div>
       <h1>Todo App Demo</h1>
       <p className="text-gray-600 mb-6">
-        This example simulates a typical application structure with multiple Zustand stores (`Todo`, `Filter`, `Input`, `Time`) interacting.
-        Listen for distinct sounds when adding, toggling, deleting todos (array modifications), changing filters (simple value change), typing in the input, or when the time updates (unrelated store).
-        The visual sort function demonstrates how rapid, successive state updates sound. The `logDiffs` option is enabled for the main `TodoStore`.
+        This example simulates a typical application structure with multiple Zustand stores (`Todo`,
+        `Filter`, `Input`, `Time`) interacting. Listen for distinct sounds when adding, toggling,
+        deleting todos (array modifications), changing filters (simple value change), typing in the
+        input, or when the time updates (unrelated store). The visual sort function demonstrates how
+        rapid, successive state updates sound. The `logDiffs` option is enabled for the main
+        `TodoStore`.
       </p>
       <TimeDisplay />
       <AddTodoForm />

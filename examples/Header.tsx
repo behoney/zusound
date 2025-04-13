@@ -21,7 +21,9 @@ export function Header() {
                 </span>
               </div>
               <span className="text-2xl font-extrabold tracking-tight text-white">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">zu</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">
+                  zu
+                </span>
                 sound
               </span>
             </Link>
@@ -29,15 +31,16 @@ export function Header() {
 
           {/* Navigation Links - Added a simple nav menu */}
           <div className="hidden md:flex space-x-8">
-            <Link to="/" className="text-white/80 hover:text-white font-medium transition-colors">
+            {/* TODO: Add features and about pages */}
+            {/* <Link to="/" className="text-white/80 hover:text-white font-medium transition-colors">
               Home
-            </Link>
-            <Link to="/features" className="text-white/80 hover:text-white font-medium transition-colors">
+            </Link> */}
+            {/* <Link to="/features" className="text-white/80 hover:text-white font-medium transition-colors">
               Features
             </Link>
             <Link to="/about" className="text-white/80 hover:text-white font-medium transition-colors">
               About
-            </Link>
+            </Link> */}
           </div>
 
           {/* Back Link */}
@@ -56,7 +59,11 @@ export function Header() {
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
                 </svg>
                 Back to Examples
               </Link>
