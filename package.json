@@ -44,7 +44,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/behoney/zusound"
+    "url": "git+https://github.com/behoney/zusound.git"
   },
   "homepage": "https://www.npmjs.com/package/zusound",
   "dependencies": {
