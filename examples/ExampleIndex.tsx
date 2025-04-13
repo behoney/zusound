@@ -13,76 +13,47 @@ const exampleLinks: ExampleLink[] = [
   {
     id: 'basic',
     title: 'Basic Usage',
-    description: 'Simple example demonstrating how to integrate zusound with Zustand stores',
+    description: 'Simple example demonstrating how to integrate zusound with Zustand stores.',
     path: '/basic',
-    image: '/screenshots/basic-usage.png', // We'll create these screenshots later
+    image: `${import.meta.env.BASE_URL || '/'}screenshots/basic-usage.png`,
   },
   {
     id: 'todo',
     title: 'Todo App',
-    description: 'A more complex example with a todo application and multiple state changes',
+    description: 'A more complex example with a todo application and multiple state changes.',
     path: '/todo',
-    image: '/screenshots/todo-app.png',
+    image: `${import.meta.env.BASE_URL || '/'}screenshots/todo-app.png`,
   },
   {
     id: 'middlewares',
     title: 'Middlewares',
-    description: 'Examples of using zusound with different Zustand middlewares',
+    description: 'Examples of using zusound with different Zustand middlewares like immer, persist, devtools.',
     path: '/middlewares',
-    image: '/screenshots/middlewares.png',
+    image: `${import.meta.env.BASE_URL || '/'}screenshots/middlewares.png`,
   },
 ]
 
 function ExampleCard({ example }: { example: ExampleLink }) {
-  const [isHovered, setIsHovered] = useState(false)
-
   return (
-    <Link
-      key={example.id}
-      to={example.path}
-      style={{
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
-    >
-      <div
-        style={{
-          border: '1px solid #eee',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          cursor: 'pointer',
-          transform: isHovered ? 'translateY(-5px)' : 'none',
-          boxShadow: isHovered ? '0 10px 20px rgba(0,0,0,0.1)' : 'none',
-        }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        <div
-          style={{
-            height: '200px',
-            backgroundColor: '#f5f5f5',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+    <Link to={example.path} className="group block h-full">
+      <div className="card flex flex-col h-full transition-all duration-200 ease-in-out group-hover:shadow-lg group-hover:-translate-y-1">
+        <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
           {example.image ? (
             <img
               src={example.image}
               alt={example.title}
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'cover' }}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
             />
           ) : (
-            <div style={{ fontSize: '5rem', color: '#ddd' }}>🔊</div>
+              <div className="text-6xl text-gray-300">🔊</div>
           )}
         </div>
-        <div style={{ padding: '20px' }}>
-          <h2 style={{ marginTop: '0', marginBottom: '10px' }}>{example.title}</h2>
-          <p style={{ margin: '0', color: '#666' }}>{example.description}</p>
+        <div className="p-5 flex-grow">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-blue-600">
+            {example.title}
+          </h2>
+          <p className="text-sm text-gray-600">{example.description}</p>
         </div>
       </div>
     </Link>
@@ -91,40 +62,29 @@ function ExampleCard({ example }: { example: ExampleLink }) {
 
 export function ExampleIndex() {
   return (
-    <div
-      style={{
-        fontFamily: 'sans-serif',
-        maxWidth: '800px',
-        margin: '0 auto',
-        padding: '20px',
-      }}
-    >
-      <header style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>zusound Examples</h1>
-        <p style={{ fontSize: '1.2rem', color: '#666' }}>
-          Explore working examples of zusound, a sonification middleware for Zustand
+    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <header className="text-center mb-10">
+        <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl border-none pb-0 mb-2">
+          🔊 zusound Examples
+        </h1>
+        <p className="mt-2 text-lg text-gray-600">
+          Explore working examples of zusound, a sonification middleware for Zustand.
         </p>
       </header>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-          gap: '20px',
-        }}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {exampleLinks.map(example => (
           <ExampleCard key={example.id} example={example} />
         ))}
       </div>
 
-      <footer style={{ marginTop: '40px', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+      <footer className="mt-12 text-center text-gray-500 text-sm">
         <p>
           <a
             href="https://github.com/behoney/zusound"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: '#0366d6', textDecoration: 'none' }}
+            className="font-medium text-blue-600 hover:text-blue-700"
           >
             View on GitHub
           </a>

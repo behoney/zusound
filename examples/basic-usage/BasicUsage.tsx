@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import { zusound } from '../../packages'
+import { zusound } from '../../packages' // Assuming correct relative path
+
+// --- Zustand Stores ---
+
+interface CountState {
+  count: number
+  increment: () => void
+}
 
 interface AnotherState {
   anotherText: string
@@ -10,42 +17,43 @@ interface AnotherState {
   updateTexts: (str: string) => void
 }
 
-// Create stores with and without generic typing
-const useCountStore = create(
-  zusound(set => ({
-    count: 0,
-    increment: () => set(state => ({ count: state.count + 1 })),
-  }))
-)
-
-const useAnotherStore = create<AnotherState>(
+const useCountStore = create<CountState>()(
   zusound(
     set => ({
-      anotherText: 'a',
+      count: 0,
+      increment: () => set(state => ({ count: state.count + 1 })),
+    }),
+    { name: 'CounterStore' } // Add name for clarity
+  )
+)
+
+const useAnotherStore = create<AnotherState>()(
+  zusound(
+    set => ({
+      anotherText: 'abc', // Initial text
       anotherCount: 0,
       anotherRandom: {},
       anotherBoolean: false,
       updateAnother: () =>
         set(state => ({
-          anotherText: `${state.anotherText}a`,
+          anotherText: `${state.anotherText}${String.fromCharCode(97 + (state.anotherText.length % 26))}`, // Cycle through alphabet
           anotherCount: state.anotherCount + 1,
           anotherRandom: {
             ...state.anotherRandom,
-            [Math.random()]: Math.random(),
+            [Math.random().toString(36).substring(7)]: Math.random(), // Random key/value
           },
           anotherBoolean: !state.anotherBoolean,
         })),
-      updateTexts: (str: string) =>
-        set(state => ({
-          ...state,
-          anotherText: str,
-        })),
+      updateTexts: (str: string) => set({ anotherText: str }), // Simplified update
     }),
     {
-      logDiffs: true,
+      logDiffs: true, // Enable logging for this store
+      name: 'AnotherStore', // Add name
     }
   )
 )
+
+// --- React Component ---
 
 function BasicUsage() {
   const { count, increment } = useCountStore()
@@ -53,128 +61,84 @@ function BasicUsage() {
     useAnotherStore()
 
   return (
-    <div
-      style={{
-        fontFamily: 'sans-serif',
-        maxWidth: '600px',
-        margin: 'auto',
-        padding: '20px',
-        border: '1px solid #eee',
-        borderRadius: '8px',
-      }}
-    >
-      <h1 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-        zusound Basic Usage Demo
-      </h1>
+    <div>
+      {/* Use the h1 from index.html's style */}
+      <h1>Basic Usage Demo</h1>
+      <p className="text-gray-600 mb-6">
+        Interact with the buttons and input fields below. Each state change triggered by these
+        actions will produce an audible sound via the `zusound` middleware. Different types of
+        changes (numbers, strings, booleans, object additions) might produce distinct sounds.
+      </p>
 
-      <section
-        style={{
-          margin: '20px 0',
-          padding: '15px',
-          backgroundColor: '#f9f9f9',
-          borderRadius: '6px',
-        }}
-      >
-        <h2>Counter Store</h2>
-        <p>
-          Current count: <strong>{count}</strong>
-        </p>
-        <p>Listen for the sound when the state changes!</p>
-        <button
-          autoFocus
-          onClick={increment}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Increment
-        </button>
+      {/* Counter Store Section */}
+      <section className="card mb-6">
+        <div className="card-body">
+          <h2 className="card-title">Counter Store</h2>
+          <p className="card-description">
+            Click the button to increment the count and hear a sound.
+          </p>
+          <p className="mb-4">
+            Current count: <strong className="text-lg font-semibold">{count}</strong>
+          </p>
+          <button autoFocus onClick={increment} className="btn btn-primary">
+            Increment Count
+          </button>
+        </div>
       </section>
 
-      <section
-        style={{
-          margin: '20px 0',
-          padding: '15px',
-          backgroundColor: '#f0f8ff',
-          borderRadius: '6px',
-        }}
-      >
-        <h2>Multiple State Properties</h2>
-        <div style={{ marginBottom: '10px' }}>
-          <p>
-            Count: <strong>{anotherCount}</strong>
-          </p>
-          <p>
-            Text: <strong>{anotherText}</strong>
-          </p>
-          <p>
-            Boolean: <strong>{String(anotherBoolean)}</strong>
+      {/* Multiple State Properties Section */}
+      <section className="card mb-6">
+        <div className="card-body">
+          <h2 className="card-title">Multiple State Properties Store</h2>
+          <div className="mb-4 space-y-1">
+            <p>
+              Count: <strong className="font-semibold">{anotherCount}</strong>
+            </p>
+            <p>
+              Text: <strong className="font-semibold">{anotherText}</strong>
+            </p>
+            <p>
+              Boolean: <strong className="font-semibold">{String(anotherBoolean)}</strong>
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="textInput" className="block text-sm font-medium text-gray-700 mb-1">
+              Update Text:
+            </label>
+            <input
+              id="textInput"
+              type="text"
+              value={anotherText}
+              onChange={evt => updateTexts(evt.target.value)}
+              className="form-input"
+            />
+          </div>
+
+          <button onClick={updateAnother} className="btn btn-primary">
+            Update Multiple Properties
+          </button>
+          <p className="text-xs text-gray-500 mt-2">
+            This button updates text, count, a boolean, and adds a random entry to an object
+            simultaneously.
           </p>
         </div>
-
-        <div style={{ marginBottom: '10px' }}>
-          <label htmlFor="textInput" style={{ display: 'block', marginBottom: '5px' }}>
-            Update Text:
-          </label>
-          <input
-            id="textInput"
-            type="text"
-            value={anotherText}
-            onChange={evt => updateTexts(evt.target.value)}
-            style={{
-              padding: '8px',
-              marginRight: '10px',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-            }}
-          />
-        </div>
-
-        <button
-          onClick={updateAnother}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#2196F3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            marginRight: '10px',
-            cursor: 'pointer',
-          }}
-        >
-          Update Multiple Properties
-        </button>
       </section>
 
-      <section
-        style={{
-          margin: '20px 0',
-          padding: '15px',
-          backgroundColor: '#fff3f0',
-          borderRadius: '6px',
-        }}
-      >
-        <h2>Combined Actions</h2>
-        <p>Click to update both stores simultaneously</p>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Combined Actions Section */}
+      <section className="card">
+        <div className="card-body">
+          <h2 className="card-title">Combined Actions</h2>
+          <p className="card-description">
+            Click the button to trigger updates in both stores at the same time. Listen for
+            potentially overlapping sounds.
+          </p>
           <button
             onClick={() => {
               increment()
               updateAnother()
             }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#9C27B0',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="btn btn-secondary" // Use a different style
           >
             Update Both Stores
           </button>
