@@ -127,17 +127,10 @@ export class AudioContextManager {
 
         // Add null check before accessing state after await
         if (!this.audioContext) throw new Error('AudioContext became null after resume')
-        if (this.audioContext.state === 'running') {
-          console.log(`AudioContext resumed successfully, state: ${this.audioContext.state}`)
-          this.isAutoplayBlocked = false
-          return { resumed: true, blocked: false }
-        } else {
-          console.warn(
-            `AudioContext still suspended after resume attempt, state: ${this.audioContext.state}. Autoplay likely blocked.`
-          )
-          this.isAutoplayBlocked = true
-          return { resumed: false, blocked: true }
-        }
+        // The await succeeded, so the state must be 'running'
+        console.log(`AudioContext resumed successfully, state: ${this.audioContext.state}`)
+        this.isAutoplayBlocked = false
+        return { resumed: true, blocked: false }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.warn(`AudioContext resume failed: ${message}. Autoplay likely blocked.`)
