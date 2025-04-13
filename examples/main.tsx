@@ -7,19 +7,13 @@ import { RouterProvider, Routes, Route } from './router'
 import { Header } from './Header'
 import Middlewares from './middlewares/Middlewares'
 
-// Create App container component with the header
+// Create App container component with the header and main content area
 function App() {
   return (
     <RouterProvider>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: '100vh',
-          margin: 0,
-        }}
-      >
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Header />
+        {/* Main content area where routes are rendered */}
         <main style={{ flex: 1 }}>
           <Routes>
             <Route path="/" element={<ExampleIndex />} />
@@ -34,8 +28,14 @@ function App() {
 }
 
 // Mount the app
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-)
+const container = document.getElementById('root')
+if (container) {
+  const root = createRoot(container)
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  )
+} else {
+  console.error("Root element with id 'root' not found.")
+}

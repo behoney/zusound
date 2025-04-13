@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
 import { zusound } from '../../packages'
+import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
+import middlewaresSource from './Middlewares.tsx?raw' // Import raw source code
 
 // Define the store state interface
 interface CounterState {
@@ -31,42 +33,36 @@ function CounterUI({
   onReset,
 }: CounterUIProps) {
   return (
-    <div className="border rounded-lg p-4 bg-white shadow-sm">
-      <h2 className="text-xl font-semibold mb-2">{title}</h2>
-      <div className="space-y-4">
-        <div className="text-lg">Count: {count}</div>
-        <div className="flex gap-2">
-          <button
-            onClick={onIncrement}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
+    <div className="card">
+      <div className="card-body">
+        <h2 className="card-title">{title}</h2>
+        <p className="card-description">{description}</p>
+        <div className="text-2xl font-bold mb-4">Count: {count}</div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={onIncrement} className="btn btn-primary">
             Increment
           </button>
-          <button
-            onClick={onDecrement}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          >
+          <button onClick={onDecrement} className="btn btn-danger">
             Decrement
           </button>
-          <button
-            onClick={onReset}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-          >
+          <button onClick={onReset} className="btn btn-secondary">
             Reset
           </button>
-        </div>
-        <div className="text-sm text-gray-600">
-          <p>{description}</p>
         </div>
       </div>
     </div>
   )
 }
 
-// Individual store implementations
+// --- Store Implementations ---
+
+// Store using Immer middleware + zusound
+// zusound should generally wrap the other middlewares.
 const useImmerCounterStore = create<CounterState>()(
   zusound(
+    // Outer: zusound intercepts final state changes
     immer(set => ({
+      // Inner: Immer handles draft mutations
       count: 0,
       increment: () =>
         set(state => {
@@ -80,13 +76,17 @@ const useImmerCounterStore = create<CounterState>()(
         set(state => {
           state.count = 0
         }),
-    }))
+    })),
+    { name: 'ImmerStore' } // zusound options
   )
 )
 
+// Store using Persist middleware + zusound
 const usePersistCounterStore = create<CounterState>()(
   zusound(
+    // Outer: zusound intercepts final state changes
     persist(
+      // Inner: Persist handles storage
       set => ({
         count: 0,
         increment: () => set(state => ({ count: state.count + 1 })),
@@ -94,28 +94,42 @@ const usePersistCounterStore = create<CounterState>()(
         reset: () => set(() => ({ count: 0 })),
       }),
       {
-        name: 'counter-storage',
+        name: 'persist-counter-storage', // Unique name for storage
       }
-    )
+    ),
+    { name: 'PersistStore' } // zusound options
   )
 )
 
+// Store using Devtools middleware + zusound
 const useDevtoolsCounterStore = create<CounterState>()(
   zusound(
-    devtools(set => ({
-      count: 0,
-      increment: () => set(state => ({ count: state.count + 1 })),
-      decrement: () => set(state => ({ count: state.count - 1 })),
-      reset: () => set(() => ({ count: 0 })),
-    }))
+    // Outer: zusound intercepts final state changes
+    devtools(
+      // Inner: Devtools connects to browser extension
+      set => ({
+        count: 0,
+        increment: () => set(state => ({ count: state.count + 1 }), false, 'INCREMENT'), // Add action names for Devtools
+        decrement: () => set(state => ({ count: state.count - 1 }), false, 'DECREMENT'),
+        reset: () => set(() => ({ count: 0 }), false, 'RESET'),
+      }),
+      { name: 'DevtoolsCounterStore' } // Name for devtools extension
+    ),
+    { name: 'DevtoolsStore' } // Name for zusound (optional but good practice)
   )
 )
 
+// Store using a mix of middlewares + zusound
+// Order matters: zusound -> devtools -> persist -> immer
 const useMixedCounterStore = create<CounterState>()(
   zusound(
+    // Outermost: zusound intercepts final changes
     devtools(
+      // Next: Devtools logs actions/state
       persist(
+        // Next: Persist saves/loads state
         immer(set => ({
+          // Innermost: Immer handles state mutations
           count: 0,
           increment: () =>
             set(state => {
@@ -131,12 +145,16 @@ const useMixedCounterStore = create<CounterState>()(
             }),
         })),
         {
-          name: 'counter-storage-mixed',
+          name: 'mixed-counter-storage', // Unique name for storage
         }
-      )
-    )
+      ),
+      { name: 'MixedCounterStoreDevtools' } // Name for devtools extension
+    ),
+    { name: 'MixedStore' } // Name for zusound
   )
 )
+
+// --- Main Component ---
 
 function Middlewares() {
   // Get state and actions from each store
@@ -146,50 +164,59 @@ function Middlewares() {
   const mixedState = useMixedCounterStore()
 
   return (
-    <div className="p-4 space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Zustand Middleware Examples</h1>
+    <div>
+      <h1>Zustand Middleware Examples</h1>
+      <p className="text-gray-600 mb-6">
+        This demonstrates using `zusound` alongside other popular Zustand middlewares: `immer`,
+        `persist`, and `devtools`. `zusound` should generally be placed as the outermost middleware
+        to capture the final state changes after other middlewares have processed them. Interact
+        with each counter to hear sounds and observe the specific effects of each middleware stack
+        (e.g., check Redux DevTools, refresh the page for persist).
+      </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {' '}
+        {/* Added mb-6 */}
         {/* Immer Counter */}
         <CounterUI
-          title="Immer Counter"
-          description="Uses Immer middleware for mutable state updates while maintaining immutability. Try incrementing/decrementing to see the effect."
+          title="zusound(immer(...))"
+          description="Uses Immer for immutable updates within drafts. Sound reflects the final state change after Immer's processing."
           count={immerState.count}
           onIncrement={immerState.increment}
           onDecrement={immerState.decrement}
           onReset={immerState.reset}
         />
-
         {/* Persist Counter */}
         <CounterUI
-          title="Persist Counter"
-          description="Uses Persist middleware to save state to localStorage. Try changing the count and refreshing the page to see persistence."
+          title="zusound(persist(...))"
+          description="Uses Persist to save state to localStorage. Sound occurs on updates. Refresh page to see persisted state load (usually silently)."
           count={persistState.count}
           onIncrement={persistState.increment}
           onDecrement={persistState.decrement}
           onReset={persistState.reset}
         />
-
         {/* Devtools Counter */}
         <CounterUI
-          title="Devtools Counter"
-          description="Uses Devtools middleware for debugging. Open Redux DevTools to see state changes."
+          title="zusound(devtools(...))"
+          description="Uses Devtools middleware. Sound occurs on updates. Open Redux DevTools extension to see actions and state history."
           count={devtoolsState.count}
           onIncrement={devtoolsState.increment}
           onDecrement={devtoolsState.decrement}
           onReset={devtoolsState.reset}
         />
-
         {/* Mixed Counter */}
         <CounterUI
-          title="Mixed Counter"
-          description="Combines all three middlewares: Immer for mutable updates, Persist for storage, and Devtools for debugging."
+          title="zusound(devtools(persist(immer(...))))"
+          description="Combines all three. Sound reflects final state. Check DevTools & refresh page to see combined effects."
           count={mixedState.count}
           onIncrement={mixedState.increment}
           onDecrement={mixedState.decrement}
           onReset={mixedState.reset}
         />
       </div>
+
+      {/* Source Code Viewer */}
+      <CodeViewer code={middlewaresSource} language="tsx" title="View Middlewares.tsx Source" />
     </div>
   )
 }
