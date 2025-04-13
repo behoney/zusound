@@ -31,6 +31,30 @@ export default defineConfig({
         }
       },
     },
+    {
+      name: 'copy-examples-assets',
+      closeBundle: async () => {
+        // Create examples/assets directory if it doesn't exist
+        const assetsDir = path.resolve(__dirname, 'dist/examples/assets')
+        if (!fs.existsSync(assetsDir)) {
+          fs.mkdirSync(assetsDir, { recursive: true })
+        }
+
+        // Copy all files from examples/assets to dist/examples/assets
+        const srcAssetsDir = path.resolve(__dirname, 'examples/assets')
+        if (fs.existsSync(srcAssetsDir)) {
+          const files = fs.readdirSync(srcAssetsDir)
+          for (const file of files) {
+            const srcFile = path.resolve(srcAssetsDir, file)
+            const destFile = path.resolve(assetsDir, file)
+            fs.copyFileSync(srcFile, destFile)
+          }
+          console.log('Successfully copied examples assets to dist')
+        } else {
+          console.error('Could not find examples/assets directory')
+        }
+      },
+    },
   ],
 
   // Configure for GitHub Pages
