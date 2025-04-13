@@ -1,6 +1,7 @@
 import type { StateCreator, StoreApi } from 'zustand/vanilla'
 import { calculateDiff } from '../diff'
-import type { TraceData, TraceOptions, TraceImpl, DiffResult } from './types'
+import type { TraceData, TraceOptions, TraceImpl } from './types'
+import type { DiffResult } from '../diff'
 
 /**
  * Calculates the difference between states and timing information.
