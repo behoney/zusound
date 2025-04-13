@@ -1,6 +1,6 @@
 # ✨ zusound: Hear Your State Changes! ✨
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
 
 Ever wondered what your application's state _sounds_ like? zusound is a lightweight Zustand middleware that transforms state changes into an auditory experience. Get real-time, sonic feedback on how your application behaves, making debugging more intuitive and maybe even... fun?
 
