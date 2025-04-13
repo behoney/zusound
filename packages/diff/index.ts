@@ -8,14 +8,17 @@
  * of state changes.
  */
 
-// Import for re-export as calculateDiff
-import { calculateSimpleDiff } from './diff'
+// Import implementation functions from diff.ts
+import { calculateDiffBase, calculateSimpleDiff, calculateDetailedDiff } from './diff'
+
+// Import types from types.d.ts
+import type { ChangeType, DiffEntry, DetailedDiff, DiffOptions, DiffResult } from './types'
 
 // Core diffing functions
-export { calculateDiffBase, calculateSimpleDiff, calculateDetailedDiff } from './diff'
+export { calculateDiffBase, calculateSimpleDiff, calculateDetailedDiff }
+
+// Default export for backward compatibility or simple usage
+export const calculateDiff = calculateSimpleDiff
 
 // Types
-export type { ChangeType, DiffEntry, DetailedDiff, DiffOptions } from './types'
-
-// Default export for backward compatibility
-export const calculateDiff = calculateSimpleDiff
+export type { ChangeType, DiffEntry, DetailedDiff, DiffOptions, DiffResult }
