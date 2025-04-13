@@ -201,6 +201,25 @@ Contributions to zusound are welcome! Please see our [Contributing Guidelines](C
 - Coding standards
 - Using the development container
 
+### Build Process
+
+zusound uses [tsup](https://github.com/egoist/tsup) for building the package. The build system simplifies bundling TypeScript code into various formats (ESM, CJS) with TypeScript declarations.
+
+To build the package:
+
+```bash
+# Development build
+bun run build
+
+# Production build (sets NODE_ENV=production)
+bun run build:prod
+```
+
+Generated output includes:
+- ESM module format (for import): `dist/index.es.js`
+- CommonJS format (for require): `dist/index.umd.js`
+- TypeScript declarations: `dist/index.d.ts`
+
 ## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
