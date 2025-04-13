@@ -3,7 +3,14 @@ import { type TraceOptions, type TraceData, trace } from '../core'
 import { Zusound, ZusoundOptions } from './types'
 import { isProduction } from './utils'
 import { sonifyChanges } from '../sonification'
-import { ensureVisualizerReady, showPersistentVisualizer } from '../visualizer'
+import {
+  ensureVisualizerReady,
+  showPersistentVisualizer,
+  hidePersistentVisualizer,
+} from '../visualizer'
+
+// Re-export visualizer control functions
+export { showPersistentVisualizer, hidePersistentVisualizer }
 
 /**
  * zusound middleware for Zustand

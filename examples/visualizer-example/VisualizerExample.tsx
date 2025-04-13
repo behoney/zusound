@@ -1,6 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { create } from 'zustand'
-import { zusound } from '../../packages'
+import {
+    zusound,
+    showPersistentVisualizer,
+    hidePersistentVisualizer,
+} from '../../packages'
 import { CodeViewer } from '../CodeViewer'
 import visualizerExampleSource from './VisualizerExample.tsx?raw'
 
@@ -12,7 +16,7 @@ interface CounterState {
     reset: () => void
 }
 
-// Create a store with zusound middleware and persistVisualizer option
+// Create a store with zusound middleware
 const useCounterStore = create<CounterState>()(
     zusound(
         set => ({
@@ -21,117 +25,106 @@ const useCounterStore = create<CounterState>()(
             decrement: () => set(state => ({ count: state.count - 1 })),
             reset: () => set({ count: 0 }),
         }),
-        {
-          // Enable the dialog+visualizer fallback for blocked audio
-          persistVisualizer: true,
-      }
-  )
+    )
 )
 
-// Example demonstrating the integrated visualizer dialog
+// Example demonstrating control of the persistent visualizer UI
 const VisualizerExample: React.FC = () => {
     const { count, increment, decrement, reset } = useCounterStore()
+    const [isVisualizerUIShown, setIsVisualizerUIShown] = useState(false)
+
+    const toggleVisualizerUI = () => {
+        if (isVisualizerUIShown) {
+            hidePersistentVisualizer()
+        } else {
+            showPersistentVisualizer()
+        }
+        setIsVisualizerUIShown(!isVisualizerUIShown)
+    }
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-6">ZuSound Visualizer Integration</h1>
+            <h1 className="text-3xl font-bold mb-6">ZuSound Persistent Visualizer Control</h1>
 
-          {/* The visualizer is NOT rendered here directly */}
+            {/* The persistent visualizer is controlled via API, not rendered here */}
 
-          <div className="mb-8 p-6 border rounded bg-gray-50">
-              <h2 className="text-xl font-semibold mb-2">Demonstration</h2>
-              <p className="mb-4">
-                  This example uses the <code>persistVisualizer: true</code> option in the `zusound`
-                  middleware. This option **does not** display a visualizer permanently.
-              </p>
-              <p className="mb-4">
-                  Instead, its purpose is to handle browser autoplay restrictions gracefully:
-              </p>
-              <ul className="list-disc pl-6 mb-4 space-y-1">
-                  <li>
-                      When the browser blocks audio initially (often requires loading the page without prior
-                      interaction), ZuSound detects this.
-                  </li>
-                  <li>
-                      Because <code>persistVisualizer: true</code> is set, a **modal dialog** automatically
-                      appears.
-                  </li>
-                  <li>
-                      This dialog explains that audio is blocked and contains an embedded **WebGL
-                      visualizer**.
-                  </li>
-                  <li>
-                      The visualizer inside the dialog provides feedback for state changes, even though you
-                      can't hear the sounds yet.
-                  </li>
-                  <li>
-                      Clicking the "Enable Audio" button in the dialog (or interacting elsewhere on the page)
-                      allows the audio context to resume, closes the dialog, and enables normal sound feedback
-                      for subsequent actions.
-                  </li>
-              </ul>
-              <p className="mb-4">
-                  <strong>To reliably see the dialog and the embedded visualizer:</strong>
-              </p>
-              <ol className="list-decimal pl-6 mb-4 space-y-1">
-                  <li>
-                      **Hard reload** the page (e.g., Ctrl+Shift+R or Cmd+Shift+R) to ensure no prior
-                      interaction is registered for autoplay purposes. Using an incognito window might also
-                      help.
-                  </li>
-                  <li>
-                      **Immediately** click the "Increment" or "Decrement" buttons **before** clicking
-                      anywhere else.
-                  </li>
-                  <li>
-                      If audio was successfully blocked by your browser, the dialog should appear, showing the
-                      visualizer reacting to the click.
-                  </li>
-                  <li>
-                      Interact with the dialog's "Enable Audio" button or click elsewhere on the page to
-                      enable sound for future actions.
-                  </li>
-              </ol>
+            <div className="mb-8 p-6 border rounded bg-gray-50">
+                <h2 className="text-xl font-semibold mb-2">Demonstration</h2>
+                <p className="mb-4">
+                    This example shows how to control the visibility of the persistent visualizer UI
+                    provided by `zusound`.
+                </p>
+                <p className="mb-4">
+                    The persistent visualizer displays feedback for sonified state changes in a corner
+                    or modal.
+                </p>
+                <ul className="list-disc pl-6 mb-4 space-y-1">
+                    <li>
+                        Use `showPersistentVisualizer` and `hidePersistentVisualizer` functions to
+                        control visibility.
+                    </li>
+                    <li>
+                        The "Toggle Visualizer UI" button below demonstrates these functions.
+                    </li>
+                    <li>
+                        When visible, state changes trigger both sound and visual feedback.
+                    </li>
+                    <li>
+                        This lets you control when feedback is presented based on application needs.
+                    </li>
+                    <li>
+                        Note: Initial visibility (set by `persistVisualizer: true` in middleware options)
+                        is separate from this manual control.
+                    </li>
+                </ul>
+                {/* Button to toggle persistent visualizer UI */}
+                <button
+                    onClick={toggleVisualizerUI} // Use the new handler
+                    className="mb-6 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                    aria-label={isVisualizerUIShown ? 'Hide visualizer UI' : 'Show visualizer UI'}
+                >
+                    {isVisualizerUIShown ? 'Hide Visualizer UI' : 'Show Visualizer UI'}
+                </button>
 
-              <div className="flex items-center gap-4 mb-6 border-t pt-4 mt-4">
-                  <button
-                      onClick={decrement}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                      aria-label="Decrement count"
-                  >
-                      Decrement
-                  </button>
+                <div className="flex items-center gap-4 mb-6 border-t pt-4 mt-4">
+                    <button
+                        onClick={decrement}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        aria-label="Decrement count"
+                    >
+                        Decrement
+                    </button>
 
-                  <div className="text-2xl font-bold min-w-[50px] text-center" aria-live="polite">
-                      {count}
-                  </div>
+                    <div className="text-2xl font-bold min-w-[50px] text-center" aria-live="polite">
+                        {count}
+                    </div>
 
-                  <button
-                      onClick={increment}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                      aria-label="Increment count"
-                  >
-                      Increment
-                  </button>
+                    <button
+                        onClick={increment}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        aria-label="Increment count"
+                    >
+                        Increment
+                    </button>
 
-                  <button
-                      onClick={reset}
-                      className="px-4 py-2 bg-red-500 text-white rounded ml-4 hover:bg-red-600 transition-colors"
-                      aria-label="Reset count"
-                  >
-                      Reset
-                  </button>
-              </div>
-          </div>
+                    <button
+                        onClick={reset}
+                        className="px-4 py-2 bg-red-500 text-white rounded ml-4 hover:bg-red-600 transition-colors"
+                        aria-label="Reset count"
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
 
-          {/* Source Code Viewer */}
-          <CodeViewer
-              code={visualizerExampleSource}
-              language="tsx"
-              title="View VisualizerExample.tsx Source"
-          />
-      </div>
-  )
+            {/* Source Code Viewer */}
+            <CodeViewer
+                code={visualizerExampleSource}
+                language="tsx"
+                title="View VisualizerExample.tsx Source"
+            />
+        </div>
+    )
 }
 
 export default VisualizerExample
