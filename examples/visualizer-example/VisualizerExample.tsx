@@ -44,7 +44,7 @@ const VisualizerExample: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-6">ZuSound Persistent Visualizer Control</h1>
+            <h1 className="text-3xl font-bold mb-6">Persistent Visualizer Control - Be careful!</h1>
 
             {/* The persistent visualizer is controlled via API, not rendered here */}
 
