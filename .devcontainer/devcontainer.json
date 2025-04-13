@@ -9,7 +9,8 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "vitest.explorer",
-        "github.vscode-pull-request-github"
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions"
       ],
       "settings": {
         "editor.formatOnSave": true,

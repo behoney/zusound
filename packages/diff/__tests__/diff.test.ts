@@ -74,10 +74,10 @@ describe('diff', () => {
     it('should provide detailed info for added properties', () => {
       const prevState = { count: 1 }
       const nextState = { count: 1, name: 'test' }
-      const diff = calculateDetailedDiff(prevState, nextState) as any
+      const diff = calculateDetailedDiff(prevState, nextState)
 
       expect(diff).toHaveProperty('name')
-      expect(diff.name).toMatchObject({
+      expect((diff as any).name).toMatchObject({
         value: 'test',
         previousValue: undefined,
         type: 'change',
@@ -87,10 +87,10 @@ describe('diff', () => {
     it('should provide detailed info for removed properties', () => {
       const prevState = { count: 1, name: 'test' }
       const nextState = { count: 1 }
-      const diff = calculateDetailedDiff(prevState, nextState) as any
+      const diff = calculateDetailedDiff(prevState, nextState)
 
       expect(diff).toHaveProperty('name')
-      expect(diff.name).toMatchObject({
+      expect((diff as any).name).toMatchObject({
         value: undefined,
         previousValue: 'test',
         type: 'change',
@@ -103,7 +103,7 @@ describe('diff', () => {
       const diff = calculateDetailedDiff(prevState, nextState)
 
       expect(diff).toHaveProperty('count')
-      expect((diff as any).count).toMatchObject({
+      expect(diff.count).toMatchObject({
         value: 2,
         previousValue: 1,
         type: 'change',
@@ -171,10 +171,10 @@ describe('diff', () => {
 
     it('should handle non-object values', () => {
       // Using any to bypass type checking for these edge cases
-      const diff = calculateDiffBase(null as any, 42 as any, { detailed: false })
+      const diff = calculateDiffBase(null, 42, { detailed: false })
       expect(diff).toBe(42)
 
-      const detailedDiff = calculateDiffBase(undefined as any, 'hello' as any, { detailed: true })
+      const detailedDiff = calculateDiffBase(undefined, 'hello', { detailed: true })
       expect(detailedDiff).toHaveProperty('value', 'hello')
       expect(detailedDiff).toHaveProperty('type', 'add')
     })
@@ -183,7 +183,7 @@ describe('diff', () => {
       // Using any to bypass type checking for these edge cases
       const prevState = { a: 1 }
       const nextState = 'not an object anymore'
-      const diff = calculateDiffBase(prevState as any, nextState as any, { detailed: false })
+      const diff = calculateDiffBase(prevState, nextState as any, { detailed: false })
       expect(diff).toBe('not an object anymore')
     })
   })

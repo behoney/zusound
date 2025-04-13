@@ -1,12 +1,5 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
-// Import calculateDiff only for its return type. Consider making DiffResult generic if this feels odd.
-import { calculateDiff } from '../diff'
-
-/**
- * Unique identifier for the trace middleware's mutation type within Zustand.
- * Required for Zustand's middleware pattern.
- */
-type TraceMutator = ['zustand/trace', never]
+import type { DiffResult } from '../diff' // Import DiffResult from diff package
 
 /** Utility type to modify properties of an existing type. */
 type Write<T, U> = Omit<T, keyof U> & U
@@ -16,7 +9,7 @@ type Write<T, U> = Omit<T, keyof U> & U
  * In this basic version, it doesn't alter the public signature significantly,
  * but defining it maintains the pattern for potential future extensions.
  */
-type WithTrace<S> = S
+type WithZusound<S> = S // Keep this simple for now
 
 /**
  * Augments the Zustand vanilla module definition.
@@ -25,18 +18,17 @@ type WithTrace<S> = S
 declare module 'zustand/vanilla' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface StoreMutators<S, A> {
-    'zustand/trace': WithTrace<S>
+    // This defines the state mutation caused by the middleware
+    zusound: WithZusound<S>
   }
 }
 
-// Define a type for the Diff result, adjust as needed
-export type DiffResult = ReturnType<typeof calculateDiff> // Or potentially `unknown` or a specific interface
+// DiffResult is now imported from '../diff'
 
 /** Data structure containing information about a single state transition. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface TraceData<T = unknown> {
   /** The calculated difference between prevState and nextState. */
-  diff: DiffResult
+  diff: DiffResult<T> // Use imported DiffResult type
   /** Timestamp when the update started processing. */
   timestampStart: number
   /** Duration of the update in milliseconds. */
@@ -54,11 +46,7 @@ export interface TraceOptions<T> {
    * Optional custom diffing function.
    * Defaults to the `calculateDiff` function from the diff package.
    */
-  diffFn?: (prevState: T, nextState: T) => DiffResult
-  /**
-   * Name to identify this store instance in traces, useful if multiple stores use the middleware.
-   */
-  name?: string
+  diffFn?: (prevState: T, nextState: T) => DiffResult<T> // Use imported DiffResult type
 }
 
 /** Public type signature for the trace middleware function. */
@@ -67,12 +55,14 @@ export type Trace = <
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
 >(
-  initializer: StateCreator<T, [...Mps, TraceMutator], Mcs>,
+  // The initializer receives ZusoundMutator in its Mps list
+  initializer: StateCreator<T, [...Mps], Mcs>,
   options?: TraceOptions<T>
-) => StateCreator<T, Mps, [TraceMutator, ...Mcs]>
+  // The returned creator has ZusoundMutator added to its Mcs list
+) => StateCreator<T, Mps, [...Mcs]>
 
 /** Internal type signature for the trace middleware's implementation. */
 export type TraceImpl = <T>(
-  initializer: StateCreator<T, [], []>,
+  initializer: StateCreator<T, [], []>, // Implementation works on the base creator
   options?: TraceOptions<T>
 ) => StateCreator<T, [], []>

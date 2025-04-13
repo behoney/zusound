@@ -1,6 +1,6 @@
 # ✨ zusound: Hear Your State Changes! ✨
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
 
 Ever wondered what your application's state _sounds_ like? zusound is a lightweight Zustand middleware that transforms state changes into an auditory experience. Get real-time, sonic feedback on how your application behaves, making debugging more intuitive and maybe even... fun?
 
@@ -200,6 +200,25 @@ Contributions to zusound are welcome! Please see our [Contributing Guidelines](C
 - Testing guidelines
 - Coding standards
 - Using the development container
+
+### Build Process
+
+zusound uses [tsup](https://github.com/egoist/tsup) for building the package. The build system simplifies bundling TypeScript code into various formats (ESM, CJS) with TypeScript declarations.
+
+To build the package:
+
+```bash
+# Development build
+bun run build
+
+# Production build (sets NODE_ENV=production)
+bun run build:prod
+```
+
+Generated output includes:
+- ESM module format (for import): `dist/index.es.js`
+- CommonJS format (for require): `dist/index.umd.js`
+- TypeScript declarations: `dist/index.d.ts`
 
 ## 📜 License
 
