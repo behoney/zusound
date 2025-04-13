@@ -101,7 +101,7 @@ const useTodoStore = create<TodoState>()(
         }
       },
     }),
-    { name: 'TodoStore', logDiffs: true }
+    { logDiffs: true }
   )
 )
 
@@ -112,13 +112,10 @@ interface FilterState {
 }
 
 const useFilterStore = create<FilterState>()(
-  zusound(
-    set => ({
-      filter: 'all',
-      setFilter: filter => set({ filter }),
-    }),
-    { name: 'FilterStore' }
-  )
+  zusound(set => ({
+    filter: 'all',
+    setFilter: filter => set({ filter }),
+  }))
 )
 
 // Store for managing the input field state
@@ -128,13 +125,10 @@ interface InputState {
 }
 
 const useInputStore = create<InputState>()(
-  zusound(
-    set => ({
-      inputValue: '',
-      setInputValue: value => set({ inputValue: value }),
-    }),
-    { name: 'InputStore' }
-  )
+  zusound(set => ({
+    inputValue: '',
+    setInputValue: value => set({ inputValue: value }),
+  }))
 )
 
 // Store for managing the current time (Example of another unrelated store)
@@ -144,17 +138,14 @@ interface TimeState {
 }
 
 const useTimeStore = create<TimeState>()(
-  zusound(
-    set => ({
-      currentTime: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }),
-      setCurrentTime: time => set({ currentTime: time }),
+  zusound(set => ({
+    currentTime: new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     }),
-    { name: 'TimeStore' }
-  )
+    setCurrentTime: time => set({ currentTime: time }),
+  }))
 )
 
 // --- React Components ---

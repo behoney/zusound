@@ -25,3 +25,6 @@ declare global {
 
 export type { Zusound, ZusoundOptions }
 export { zusound }
+
+// Also export the visualizer control functions from zusound.ts
+export { showPersistentVisualizer, hidePersistentVisualizer } from '../visualizer'

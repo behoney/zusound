@@ -1,7 +1,6 @@
 import type { StateCreator, StoreApi } from 'zustand/vanilla'
 import { calculateDiff } from '../diff'
 import type { TraceData, TraceOptions, TraceImpl, DiffResult } from './types'
-import { sonifyChanges } from '../sonification'
 
 /**
  * Calculates the difference between states and timing information.
@@ -23,15 +22,15 @@ const calculateTraceData = <T>(
 
 /**
  * Processes the calculated trace data by sonifying changes and calling the onTrace callback.
+ * We'll skip the default sonifyChanges call since we've customized it in the zusound middleware
+ * with the persistVisualizer option.
  */
 const processTrace = <T>(
   traceData: TraceData<T>,
   onTrace: (traceData: TraceData<T>) => void
 ): void => {
-  // Sonify the changes based on the diff and duration.
-  sonifyChanges(traceData.diff, traceData.duration)
-
   // Execute the user-provided callback, handling potential errors.
+  // The sonification is now handled by zusound middleware with the persistVisualizer option
   try {
     onTrace(traceData)
   } catch (error) {

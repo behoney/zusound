@@ -28,11 +28,18 @@ export interface DiffEntry<T> {
 }
 
 /**
- * A detailed diff result containing change type information
+ * A detailed diff result containing change type information for object properties.
+ * If T is not an object, it directly uses DiffEntry<T>.
  */
 export type DetailedDiff<T> = T extends object
   ? { [K in keyof Partial<T>]: DiffEntry<T[K]> }
-  : DiffEntry<T>
+  : DiffEntry<T> // Handle non-object types directly
+
+/**
+ * A simple diff result containing only the changed properties with their new values.
+ * If T is not an object, it represents the new value directly.
+ */
+export type DiffResult<T = unknown> = T extends object ? Partial<T> : T
 
 /**
  * Options for the diff calculation

@@ -6,6 +6,7 @@ import { ExampleIndex } from './ExampleIndex'
 import { RouterProvider, Routes, Route } from './router'
 import { Header } from './Header'
 import Middlewares from './middlewares/Middlewares'
+import VisualizerExample from './visualizer-example/VisualizerExample'
 
 // Create App container component with the header and main content area
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Route path="/basic" element={<BasicUsage />} />
             <Route path="/todo" element={<TodoApp />} />
             <Route path="/middlewares" element={<Middlewares />} />
+            <Route path="/visualizer" element={<VisualizerExample />} />
           </Routes>
         </main>
       </div>

@@ -1,4 +1,5 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
+import type { DiffResult } from '../diff' // Import DiffResult from diff package
 
 /** Utility type to modify properties of an existing type. */
 type Write<T, U> = Omit<T, keyof U> & U
@@ -22,14 +23,12 @@ declare module 'zustand/vanilla' {
   }
 }
 
-// Define a type for the Diff result, adjust as needed
-// Using Partial<T> as a placeholder, assuming calculateDiff returns changed properties
-export type DiffResult<T = unknown> = Partial<T> // Or potentially `unknown` or a specific interface
+// DiffResult is now imported from '../diff'
 
 /** Data structure containing information about a single state transition. */
 export interface TraceData<T = unknown> {
   /** The calculated difference between prevState and nextState. */
-  diff: DiffResult<T>
+  diff: DiffResult<T> // Use imported DiffResult type
   /** Timestamp when the update started processing. */
   timestampStart: number
   /** Duration of the update in milliseconds. */
@@ -47,11 +46,7 @@ export interface TraceOptions<T> {
    * Optional custom diffing function.
    * Defaults to the `calculateDiff` function from the diff package.
    */
-  diffFn?: (prevState: T, nextState: T) => DiffResult<T>
-  /**
-   * Name to identify this store instance in traces, useful if multiple stores use the middleware.
-   */
-  name?: string
+  diffFn?: (prevState: T, nextState: T) => DiffResult<T> // Use imported DiffResult type
 }
 
 /** Public type signature for the trace middleware function. */

@@ -1,6 +1,7 @@
 import { SonicChunk } from './types'
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager, simpleHash } from './utils'
+import { ZusoundEventDetail } from '../visualizer'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -13,19 +14,43 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
     return []
   }
 
-  return Object.entries(diff).map(([key, value]) => {
+  // --- Helper function to recursively get keys ---
+  // This flattens the diff for consistent processing, but might lose some structural info.
+  // Consider if a deep diff structure is needed later. For now, simple diff keys are used.
+  const flattenKeys = (obj: Record<string, unknown>, prefix = ''): Record<string, unknown> => {
+    return Object.keys(obj).reduce(
+      (acc, k) => {
+        const pre = prefix.length ? `${prefix}.` : ''
+        if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+          // Optionally recurse into nested objects if needed
+          // Object.assign(acc, flattenKeys(obj[k], pre + k));
+          // For now, treat nested objects as a single change at the top level key
+          acc[pre + k] = obj[k]
+        } else {
+          acc[pre + k] = obj[k]
+        }
+        return acc
+      },
+      {} as Record<string, unknown>
+    )
+  }
+
+  const flatDiff = flattenKeys(diff as Record<string, unknown>)
+
+  return Object.entries(flatDiff).map(([key, value]) => {
     // Determine value type based on the change
     const valueType = value === undefined || value === null ? 'remove' : 'change'
 
     // --- Frequency Calculation ---
     // Map key hash to a base frequency within a scale
+    // Using the potentially flattened key 'key'
     const hash = simpleHash(key)
     const octave = Math.floor(hash / 100) % 3 // Shift up 0, 1, or 2 octaves
     const scaleIndex = hash % AUDIO_CONFIG.SCALE.length
     let frequency =
       AUDIO_CONFIG.BASE_FREQUENCY * Math.pow(2, octave) * AUDIO_CONFIG.SCALE[scaleIndex]
 
-    // Adjust frequency by key depth
+    // Adjust frequency by key depth (split the potentially flattened key)
     const depth = key.split('.').length - 1
     frequency *= 1 + depth * 0.05 // Increase pitch slightly for deeper keys
 
@@ -58,7 +83,7 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
       } else if (valueOfType === 'boolean') {
         waveType = 'sawtooth'
       } else {
-        waveType = 'triangle' // Objects, etc.
+        waveType = 'triangle' // Objects, arrays, etc.
       }
     }
 
@@ -68,7 +93,7 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
         : AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE
 
     return {
-      id: key,
+      id: key, // Use the potentially flattened key as ID
       type: waveType,
       valueType,
       frequency,
@@ -80,103 +105,148 @@ export function diffToSonic<T>(diff: Partial<T>, duration: number): SonicChunk[]
 }
 
 /**
- * Play a sonic chunk using the Web Audio API
+ * Play a sonic chunk using the Web Audio API.
+ * Dispatches visualization events regardless of playback success.
  * @param chunk - The sonic chunk to play
- * @throws Error if Web Audio API is not supported or audio cannot be played
+ * @returns Promise resolving to true if audio playback started, false otherwise.
  */
-export function playSonicChunk(chunk: SonicChunk): void {
-  // TODO(#11):: long function, refactor this into smaller functions
+export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
   try {
-    const ctx = AudioContextManager.getInstance().getContext()
+    const audioManager = AudioContextManager.getInstance()
+    const ctx = audioManager.getContext() // Ensures context is ready
 
-    // If audio context is suspended (e.g., browser autoplay policy), try to resume it
-    if (ctx.state === 'suspended') {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ctx.resume().catch(err => {})
+    // Dispatch custom event for visualizer *before* attempting playback
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent<ZusoundEventDetail>('zusound', {
+        detail: { chunk },
+      })
+      window.dispatchEvent(event)
     }
 
-    const now = ctx.currentTime
-    const duration = chunk.duration / 1000 // Convert to seconds
-
-    // Create and configure oscillator
-    const oscillator = ctx.createOscillator()
-    oscillator.type = chunk.type
-    oscillator.frequency.setValueAtTime(chunk.frequency, now)
-    oscillator.detune.setValueAtTime(chunk.detune, now) // Apply detuning
-
-    // Create gain node with envelope
-    const gainNode = ctx.createGain()
-    gainNode.gain.setValueAtTime(0, now)
-
-    // Connect nodes
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    // Calculate envelope timings
-    const attackTime = Math.min(0.01, duration * 0.2)
-    const releaseTime = Math.min(0.08, duration * 0.3)
-    const sustainTime = duration - attackTime - releaseTime
-
-    // Apply envelope
-    if (duration > 0.02) {
-      // Attack
-      gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
-      // Sustain
-      gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainTime)
-      // Release
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
+    // Attempt to resume context if suspended
+    let canPlayAudio = false
+    if (ctx.state === 'running') {
+      canPlayAudio = true
+    } else if (ctx.state === 'suspended') {
+      console.log(`Audio context suspended before playing chunk ${chunk.id}. Attempting resume...`)
+      const { resumed } = await audioManager.tryResumeAudioContext()
+      if (resumed) {
+        canPlayAudio = true
+      } else {
+        console.warn(`Audio playback skipped for chunk ${chunk.id} - context still suspended.`)
+        return false // Indicate audio didn't play
+      }
     } else {
-      // For very short sounds, use simpler envelope
-      gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
-      gainNode.gain.linearRampToValueAtTime(0, now + duration)
+      console.warn(
+        `Audio context in unexpected state (${ctx.state}) for chunk ${chunk.id}. Cannot play.`
+      )
+      return false // Cannot play in closed or other states
     }
 
-    // Schedule oscillator and add event listeners for cleanup
-    oscillator.onended = () => {
-      oscillator.disconnect()
-      gainNode.disconnect()
+    // Only proceed if context is running
+    if (canPlayAudio && ctx.state === 'running') {
+      const now = ctx.currentTime
+      const duration = chunk.duration / 1000 // Convert ms to seconds
+
+      const oscillator = ctx.createOscillator()
+      oscillator.type = chunk.type
+      oscillator.frequency.setValueAtTime(chunk.frequency, now)
+      oscillator.detune.setValueAtTime(chunk.detune, now)
+
+      const gainNode = ctx.createGain()
+      gainNode.gain.setValueAtTime(0, now)
+      oscillator.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      const attackTime = Math.min(0.01, duration * 0.2)
+      const releaseTime = Math.min(0.08, duration * 0.3)
+      const sustainDuration = Math.max(0, duration - attackTime - releaseTime)
+
+      if (duration > 0.02) {
+        gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
+        if (sustainDuration > 0.001) {
+          gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainDuration)
+        }
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
+      } else {
+        gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
+        gainNode.gain.linearRampToValueAtTime(0, now + duration)
+      }
+
+      oscillator.start(now)
+      oscillator.stop(now + duration)
+
+      // Cleanup promise with timeout safety
+      await new Promise<void>(resolve => {
+        let resolved = false
+        const timeoutId = setTimeout(
+          () => {
+            if (!resolved) {
+              console.warn(`Oscillator onended for chunk ${chunk.id} timed out. Force cleaning up.`)
+              try {
+                oscillator.disconnect()
+                gainNode.disconnect()
+              } catch {
+                /* ignore */
+              }
+              resolved = true
+              resolve()
+            }
+          },
+          duration * 1000 + 150
+        )
+
+        oscillator.onended = () => {
+          if (!resolved) {
+            clearTimeout(timeoutId)
+            try {
+              oscillator.disconnect()
+              gainNode.disconnect()
+            } catch {
+              /* ignore */
+            }
+            resolved = true
+            resolve()
+          }
+        }
+      })
+      return true // Audio playback initiated
     }
 
-    oscillator.start(now)
-    oscillator.stop(now + duration)
+    return false // Audio did not play
   } catch (err) {
-    if (err instanceof Error) {
-      throw new Error(`Failed to play audio: ${err.message}`)
-    } else {
-      throw new Error('Failed to play audio')
-    }
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`Failed to prepare audio for chunk ${chunk.id}:`, message)
+    return false // Indicate audio setup/playback failed
   }
 }
 
 /**
- * Play a sonic representation of state changes
- * @param diff - The object containing state changes to sonify
- * @param duration - Base duration for each sonic chunk in milliseconds
+ * Generates sonic chunks and plays them.
+ * Visualizer listens independently via dispatched events.
+ * @param diff - State changes
+ * @param duration - Sound duration
+ * @param _persistVisualizer - No longer used for UI control, kept for potential future options
  */
-export function sonifyChanges<T>(diff: Partial<T>, duration: number): void {
+export function sonifyChanges<T>(
+  diff: Partial<T>,
+  duration: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _persistVisualizer: boolean = false // Parameter kept for signature compatibility, but unused
+): void {
   try {
     const chunks = diffToSonic(diff, duration)
+    if (chunks.length === 0) return
 
-    if (chunks.length === 0) {
-      return
-    }
-
-    // Use staggered playback for clearer auditory perception
+    // Stagger playback
     chunks.forEach((chunk, index) => {
       setTimeout(() => {
-        try {
-          playSonicChunk(chunk)
-        } catch (err) {
-          // Catch errors specifically from the asynchronous playSonicChunk call
-          console.error(
-            `Sonification failed during playback for chunk ${chunk.id}:`,
-            err instanceof Error ? err.message : String(err)
-          )
-        }
+        playSonicChunk(chunk).catch(err => {
+          console.error(`Error during scheduled playback for chunk ${chunk.id}:`, err)
+        })
       }, index * AUDIO_CONFIG.STAGGER_DELAY_MS)
     })
   } catch (err: unknown) {
-    // Catch synchronous errors (e.g., from diffToSonic)
-    console.error('Sonification failed:', err instanceof Error ? err.message : String(err))
+    console.error('Sonification setup failed:', err instanceof Error ? err.message : String(err))
   }
 }
