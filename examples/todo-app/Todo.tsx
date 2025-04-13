@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { create } from 'zustand'
 import { zusound } from '../../packages' // Adjust the import path if necessary
+import { CodeViewer } from '../CodeViewer'; // Import the CodeViewer
+import todoSource from './Todo.tsx?raw'; // Import raw source code
 
 // --- Types ---
 interface Todo {
@@ -175,8 +177,7 @@ function TimeDisplay() {
 
   return (
     <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2 text-gray-600 text-sm mb-4">
-      Current Time: <strong className="font-mono">{currentTime}</strong> (Example of an unrelated
-      store update)
+      Current Time: <strong className="font-mono">{currentTime}</strong> (This demonstrates an unrelated store update triggering its own sound.)
     </div>
   )
 }
@@ -265,7 +266,7 @@ function TodoList() {
       <div className="card-body">
         <h2 className="card-title !mt-0">Tasks</h2> {/* Use !mt-0 to override default */}
         {isSorting && (
-          <div className="text-sm text-blue-600 mb-2 animate-pulse">Sorting...</div>
+          <div className="text-sm text-blue-600 mb-2 animate-pulse">Sorting... (Notice the rapid sounds from frequent state updates)</div>
         )}
         {filteredTodos.length === 0 && !isSorting ? (
           <p className="text-gray-500">No tasks here. Add one above!</p>
@@ -313,7 +314,7 @@ function Controls() {
 
 
   return (
-    <div className="card">
+    <div className="card mb-6"> {/* Added mb-6 for spacing */}
       <div className="card-body space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-sm mr-2">Show:</span>
@@ -334,7 +335,7 @@ function Controls() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-sm mr-2">Sort By ID:</span>
+          <span className="font-medium text-sm mr-2">Sort By ID (Visual Sort):</span>
           <button
             onClick={() => handleSort('asc')}
             disabled={isSorting && sortOrder !== 'asc'} // Disable if sorting different order
@@ -364,14 +365,17 @@ export function TodoApp() {
     <div>
       <h1>Todo App Demo</h1>
       <p className="text-gray-600 mb-6">
-        A slightly more complex example using multiple Zustand stores (`Todo`, `Filter`, `Input`,
-        `Time`). Listen for sounds when adding, toggling, deleting, filtering, or sorting todos. The
-        sorting uses a visual algorithm with frequent state updates.
+        This example simulates a typical application structure with multiple Zustand stores (`Todo`, `Filter`, `Input`, `Time`) interacting.
+        Listen for distinct sounds when adding, toggling, deleting todos (array modifications), changing filters (simple value change), typing in the input, or when the time updates (unrelated store).
+        The visual sort function demonstrates how rapid, successive state updates sound. The `logDiffs` option is enabled for the main `TodoStore`.
       </p>
       <TimeDisplay />
       <AddTodoForm />
       <TodoList />
       <Controls />
+
+      {/* Source Code Viewer */}
+      <CodeViewer code={todoSource} language="tsx" title="View Todo.tsx Source" />
     </div>
   )
 }

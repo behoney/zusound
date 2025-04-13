@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Link } from './router'
 
 interface ExampleLink {
@@ -13,21 +13,21 @@ const exampleLinks: ExampleLink[] = [
   {
     id: 'basic',
     title: 'Basic Usage',
-    description: 'Simple example demonstrating how to integrate zusound with Zustand stores.',
+    description: 'Demonstrates fundamental integration with two simple stores, showcasing sound feedback for various data types (number, string, boolean, object property addition). Includes source code viewer.',
     path: '/basic',
     image: `${import.meta.env.BASE_URL || '/'}screenshots/basic-usage.png`,
   },
   {
     id: 'todo',
     title: 'Todo App',
-    description: 'A more complex example with a todo application and multiple state changes.',
+    description: 'A more complex app with multiple stores (Todos, Filter, Input, Time). Shows sounds for array operations (add, toggle, delete), simple value changes (filter), and rapid updates (visual sort). Includes source code viewer.',
     path: '/todo',
     image: `${import.meta.env.BASE_URL || '/'}screenshots/todo-app.png`,
   },
   {
     id: 'middlewares',
-    title: 'Middlewares',
-    description: 'Examples of using zusound with different Zustand middlewares like immer, persist, devtools.',
+    title: 'Middleware Compatibility',
+    description: 'Shows how to correctly compose zusound with other common Zustand middlewares like immer, persist, and devtools. Includes source code viewer.',
     path: '/middlewares',
     image: `${import.meta.env.BASE_URL || '/'}screenshots/middlewares.png`,
   },
@@ -68,7 +68,7 @@ export function ExampleIndex() {
           🔊 zusound Examples
         </h1>
         <p className="mt-2 text-lg text-gray-600">
-          Explore working examples of zusound, a sonification middleware for Zustand.
+          Explore working examples of zusound, a sonification middleware for Zustand. Each example includes interactive demos and viewable source code.
         </p>
       </header>
 
@@ -89,7 +89,7 @@ export function ExampleIndex() {
             View on GitHub
           </a>
         </p>
-      </footer>
+      </footer> 
     </div>
   )
 }

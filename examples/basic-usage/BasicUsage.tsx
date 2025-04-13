@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { zusound } from '../../packages' // Assuming correct relative path
+import { CodeViewer } from '../CodeViewer'; // Import the CodeViewer
+import basicUsageSource from './BasicUsage.tsx?raw'; // Import raw source code
 
 // --- Zustand Stores ---
 
@@ -62,12 +64,12 @@ function BasicUsage() {
 
   return (
     <div>
-      {/* Use the h1 from index.html's style */}
       <h1>Basic Usage Demo</h1>
       <p className="text-gray-600 mb-6">
-        Interact with the buttons and input fields below. Each state change triggered by these
-        actions will produce an audible sound via the `zusound` middleware. Different types of
-        changes (numbers, strings, booleans, object additions) might produce distinct sounds.
+        This example demonstrates the fundamental integration of `zusound` with two simple Zustand stores.
+        Interact with the buttons and input fields. Each state change (incrementing a count, updating text, toggling a boolean, adding an object property)
+        will trigger the `zusound` middleware, producing distinct audible feedback based on the nature of the change.
+        The second store also demonstrates the `logDiffs` option.
       </p>
 
       {/* Counter Store Section */}
@@ -75,7 +77,7 @@ function BasicUsage() {
         <div className="card-body">
           <h2 className="card-title">Counter Store</h2>
           <p className="card-description">
-            Click the button to increment the count and hear a sound.
+            Updates a single `count` number state. Click the button to increment and hear a sound mapped to number changes.
           </p>
           <p className="mb-4">
             Current count: <strong className="text-lg font-semibold">{count}</strong>
@@ -90,6 +92,9 @@ function BasicUsage() {
       <section className="card mb-6">
         <div className="card-body">
           <h2 className="card-title">Multiple State Properties Store</h2>
+          <p className="card-description">
+            Manages multiple state properties (`string`, `number`, `boolean`, `object`). Interact to hear sounds mapped to different data types and changes.
+          </p>
           <div className="mb-4 space-y-1">
             <p>
               Count: <strong className="font-semibold">{anotherCount}</strong>
@@ -119,19 +124,18 @@ function BasicUsage() {
             Update Multiple Properties
           </button>
           <p className="text-xs text-gray-500 mt-2">
-            This button updates text, count, a boolean, and adds a random entry to an object
-            simultaneously.
+            This button updates text (string), count (number), a boolean, and adds a random entry to an object
+            simultaneously, showcasing mixed sound feedback.
           </p>
         </div>
       </section>
 
       {/* Combined Actions Section */}
-      <section className="card">
+      <section className="card mb-6"> {/* Added mb-6 for spacing */}
         <div className="card-body">
           <h2 className="card-title">Combined Actions</h2>
           <p className="card-description">
-            Click the button to trigger updates in both stores at the same time. Listen for
-            potentially overlapping sounds.
+            Click the button to trigger updates in both stores concurrently. Listen for potentially overlapping sounds from independent store updates.
           </p>
           <button
             onClick={() => {
@@ -144,6 +148,9 @@ function BasicUsage() {
           </button>
         </div>
       </section>
+
+      {/* Source Code Viewer */}
+      <CodeViewer code={basicUsageSource} language="tsx" title="View BasicUsage.tsx Source" />
     </div>
   )
 }
