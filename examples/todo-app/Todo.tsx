@@ -101,7 +101,7 @@ const useTodoStore = create<TodoState>()(
         }
       },
     }),
-    { logDiffs: true }
+    { logDiffs: true, persistVisualizer: true }
   )
 )
 

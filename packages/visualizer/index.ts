@@ -10,7 +10,7 @@
 // the autoplay warning dialog.
 
 import type { SonicChunk } from '../sonification' // Adjusted import path
-import type { ZusoundEvent } from './types'
+import type { ZusoundEvent, ZusoundEventDetail } from './types' // Import ZusoundEventDetail
 
 // Export types
 export * from './types'
@@ -481,6 +481,8 @@ export class Visualizer {
   private shaderManager: VisualizerShaderManager | null = null
   private isInitialized = false
   private eventListenerAttached = false
+  private isPersistentlyDisplayed = false
+  private floatingContainer: HTMLDivElement | null = null
 
   private constructor() {
     // Private constructor for singleton
@@ -557,13 +559,115 @@ export class Visualizer {
   }
 
   /**
+   * Show a persistent visualizer in the corner of the screen regardless of audio state.
+   * This is used when persistVisualizer is true.
+   */
+  public showPersistentVisualizer(): void {
+    if (this.isPersistentlyDisplayed || typeof document === 'undefined') return
+
+    // Initialize if not already
+    if (!this.isInitialized) {
+      if (!this.initialize()) {
+        console.error('Failed to initialize visualizer for persistent display')
+        return
+      }
+    }
+
+    // Get canvas element
+    const canvas = this.getCanvasElement()
+    if (!canvas) {
+      console.error('Canvas element not available for persistent display')
+      return
+    }
+
+    // Create floating container if it doesn't exist
+    if (!this.floatingContainer) {
+      this.floatingContainer = document.createElement('div')
+      this.floatingContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        background: rgba(30, 30, 40, 0.7);
+        border-radius: 50%;
+        padding: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+        backdrop-filter: blur(3px);
+      `
+
+      // Add hover effect
+      this.floatingContainer.addEventListener('mouseenter', () => {
+        if (this.floatingContainer) {
+          this.floatingContainer.style.transform = 'scale(1.1)'
+          this.floatingContainer.style.opacity = '1'
+        }
+      })
+
+      this.floatingContainer.addEventListener('mouseleave', () => {
+        if (this.floatingContainer) {
+          this.floatingContainer.style.transform = 'scale(1)'
+          this.floatingContainer.style.opacity = '0.8'
+        }
+      })
+
+      // Initial state slightly transparent
+      this.floatingContainer.style.opacity = '0.8'
+    }
+
+    // Ensure canvas has correct styling for floating display
+    canvas.style.margin = '0'
+    canvas.style.display = 'block'
+
+    // Add the canvas to the floating container
+    this.floatingContainer.appendChild(canvas)
+
+    // Add to document body
+    document.body.appendChild(this.floatingContainer)
+
+    console.log(this.floatingContainer)
+
+    // Notify visualization system that canvas is mounted
+    this.notifyMounted()
+
+    this.isPersistentlyDisplayed = true
+  }
+
+  /**
+   * Hide the persistent visualizer if it's being displayed
+   */
+  public hidePersistentVisualizer(): void {
+    if (!this.isPersistentlyDisplayed || !this.floatingContainer) return
+
+    // Notify visualization system that canvas is being unmounted
+    this.notifyUnmounted()
+
+    // Remove from DOM
+    if (this.floatingContainer.parentNode) {
+      this.floatingContainer.parentNode.removeChild(this.floatingContainer)
+    }
+
+    this.isPersistentlyDisplayed = false
+  }
+
+  /**
+   * Check if the visualizer is currently being displayed persistently
+   */
+  public isPersistentVisualizerDisplayed(): boolean {
+    return this.isPersistentlyDisplayed
+  }
+
+  /**
    * Clean up visualizer resources.
    */
   public cleanup(): void {
+    this.hidePersistentVisualizer()
     this.shaderManager?.cleanup()
     this.detachEventListener()
     this.isInitialized = false
     this.shaderManager = null
+    this.floatingContainer = null
     // Don't reset Visualizer.instance, allow re-initialization if needed
   }
 
@@ -624,21 +728,31 @@ export function visualizeSonicChunk(chunk: SonicChunk): void {
 }
 
 /**
- * Ensures the visualizer is initialized and listening for events.
- * No longer mounts anything by default. Call this early in your app setup.
- * Returns a cleanup function.
+ * Ensures the visualizer singleton is initialized and listening for events.
+ * This is primarily for internal use or advanced scenarios. It doesn't mount UI.
+ * Returns a cleanup function (currently a no-op for the singleton).
  */
 export function initializeVisualizer(): () => void {
   const visualizer = Visualizer.getInstance()
   visualizer.initialize()
 
-  // Return cleanup function
+  // Return cleanup function (noop for singleton instance)
   return () => {
-    // The cleanup method handles detaching listener now
-    // visualizer.cleanup(); // Don't cleanup singleton fully here maybe?
+    // visualizer.cleanup(); // Cleanup might be too aggressive for singleton
   }
 }
 
-// Remove React component exports
-// export { Visualizer as VisualizerComponent } from './VisualizerComponent'
-// export { default as VisualizerReact } from './VisualizerComponent'
+/**
+ * Shows a persistent visualizer in the corner of the screen.
+ * Use this when persistVisualizer is true to always display the visualizer.
+ */
+export function showPersistentVisualizer(): void {
+  Visualizer.getInstance().showPersistentVisualizer()
+}
+
+/**
+ * Hides the persistent visualizer if it's being displayed.
+ */
+export function hidePersistentVisualizer(): void {
+  Visualizer.getInstance().hidePersistentVisualizer()
+}

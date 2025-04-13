@@ -1,4 +1,4 @@
-import { Visualizer } from '../visualizer' // Import the Visualizer singleton manager
+import { Visualizer, showPersistentVisualizer } from '../visualizer' // Import the Visualizer singleton manager and showPersistentVisualizer function
 
 /**
  * Utility functions for the sonification module
@@ -13,6 +13,7 @@ export class AudioContextManager {
   private isAutoplayBlocked = false
   private visualizerDialog: HTMLDialogElement | null = null
   private visualizerCanvasContainer: HTMLDivElement | null = null // Container for the canvas inside the dialog
+  private persistentVisualizer = false // Track whether persistent visualizer is enabled
 
   private constructor() {
     // Private constructor to enforce singleton pattern
@@ -41,6 +42,11 @@ export class AudioContextManager {
         this.audioContext = new AudioContext()
         // Ensure Visualizer is initialized when context is created/recreated
         Visualizer.getInstance().initialize()
+
+        // Show persistent visualizer if enabled
+        if (this.persistentVisualizer) {
+          showPersistentVisualizer()
+        }
       } catch (err: unknown) {
         this.audioContext = null
         const message = err instanceof Error ? err.message : String(err)
@@ -49,6 +55,25 @@ export class AudioContextManager {
       }
     }
     return this.audioContext
+  }
+
+  /**
+   * Enable or disable persistent visualizer display.
+   * When enabled, visualizer will always be shown regardless of audio state.
+   * @param enable Whether to enable persistent visualizer
+   */
+  public setPersistentVisualizer(enable: boolean): void {
+    this.persistentVisualizer = enable
+
+    // If enabling, show visualizer immediately if the context is initialized
+    if (enable) {
+      showPersistentVisualizer()
+    } else {
+      // If disabling, only hide if we're not showing the dialog
+      if (!this.visualizerDialog || !this.visualizerDialog.open) {
+        Visualizer.getInstance().hidePersistentVisualizer()
+      }
+    }
   }
 
   /**
@@ -77,14 +102,40 @@ export class AudioContextManager {
     }
 
     try {
-      await ctx.resume()
-      this.isAutoplayBlocked = false
+      // Use Promise.race with a timeout to handle cases where resume() might never resolve/reject
+      const resumeResult = await Promise.race([
+        ctx.resume().then(() => {
+          console.log(`AudioContext resumed successfully, current state: ${ctx.state}`)
+          return 'resumed'
+        }),
+        // Add a timeout to ensure we don't hang indefinitely
+        new Promise<string>(resolve =>
+          setTimeout(() => {
+            console.warn('AudioContext resume() timed out after 1000ms')
+            resolve('timeout')
+          }, 1000)
+        ),
+      ])
 
-      // If we successfully resumed and had a dialog, close it
-      this.closeVisualizerDialog()
+      if (resumeResult === 'timeout') {
+        console.warn(
+          `Audio context resume timed out - browser may be blocking audio. Current state: ${ctx.state}`
+        )
+        throw new Error('Audio context resume timed out')
+      }
 
-      return true
+      // Check if context actually resumed (in some browsers it might "resolve" but still be suspended)
+      if (ctx.state !== 'suspended') {
+        this.isAutoplayBlocked = false
+        this.closeVisualizerDialog()
+        return true
+      } else {
+        // If context is still suspended after "successful" resume, consider it blocked
+        console.warn('Audio context still suspended after resume call - browser is blocking audio')
+        throw new Error('Audio context still suspended after resume call')
+      }
     } catch (err) {
+      // This will now catch both explicit errors and the timeout
       this.isAutoplayBlocked = true
       console.warn(
         'Audio context could not be resumed due to browser autoplay restrictions:',
@@ -93,7 +144,11 @@ export class AudioContextManager {
 
       // Show visualizer dialog only if requested and resume failed
       if (showVisualizerDialogIfBlocked) {
-        this.showVisualizerDialog()
+        // If persistent visualizer is enabled, we don't need to show the dialog
+        // as the visualizer is already visible in the corner
+        if (!this.persistentVisualizer) {
+          this.showVisualizerDialog()
+        }
       }
 
       return false
@@ -105,6 +160,11 @@ export class AudioContextManager {
    * Only shown when `persistVisualizer` is true and audio is blocked.
    */
   public showVisualizerDialog(): void {
+    // If persistent visualizer is enabled, don't show the dialog
+    if (this.persistentVisualizer) {
+      return
+    }
+
     // Don't create multiple dialogs
     if (this.visualizerDialog && this.visualizerDialog.open) {
       return
@@ -330,6 +390,11 @@ export class AudioContextManager {
       }
       this.visualizerDialog = null
       this.visualizerCanvasContainer = null // Clear container ref
+
+      // If persistent visualizer is enabled, show it after closing the dialog
+      if (this.persistentVisualizer) {
+        showPersistentVisualizer()
+      }
     }
     // Consider removing document-level interaction listeners here if they weren't removed automatically
     // This might require storing the listener function references
@@ -358,6 +423,9 @@ export class AudioContextManager {
 
     // Close and remove dialog
     this.closeVisualizerDialog()
+
+    // Disable persistent visualizer if enabled
+    this.setPersistentVisualizer(false)
 
     // It might be too aggressive to cleanup the Visualizer singleton here,
     // as other parts of the app might re-initialize it. Let it persist unless

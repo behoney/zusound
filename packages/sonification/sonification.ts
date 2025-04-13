@@ -117,6 +117,8 @@ export async function playSonicChunk(
   // TODO(#11):: long function, refactor this into smaller functions
   try {
     const audioManager = AudioContextManager.getInstance()
+    // Ensure persistent visualizer setting is consistent
+    audioManager.setPersistentVisualizer(persistVisualizer)
     const ctx = audioManager.getContext() // Ensures context and Visualizer are initialized
 
     // Dispatch custom event for visualizer *before* attempting playback
@@ -129,104 +131,125 @@ export async function playSonicChunk(
     }
 
     // If audio context is suspended (e.g., browser autoplay policy), try to resume it
+    let canPlayAudio = true
     if (ctx.state === 'suspended') {
+      console.log(`Audio context is suspended before attempting playback for chunk ${chunk.id}`)
+
       // Try to resume, showing dialog only if persistVisualizer is true AND resume fails
-      const resumed = await audioManager.tryResumeAudioContext(persistVisualizer)
-      if (!resumed) {
-        // If still suspended after trying, don't attempt to play sound
-        console.warn(`Audio playback skipped for chunk ${chunk.id} - context suspended.`)
-        return // Exit function, audio cannot play
-      }
-      // If resumed successfully, continue to playback logic below
-    }
+      try {
+        const resumed = await audioManager.tryResumeAudioContext(persistVisualizer)
 
-    // --- Audio Playback Logic ---
-    // This part only runs if the context is 'running'
-
-    const now = ctx.currentTime
-    const duration = chunk.duration / 1000 // Convert to seconds
-
-    // Create and configure oscillator
-    const oscillator = ctx.createOscillator()
-    oscillator.type = chunk.type
-    // Use setValueAtTime for frequency and detune to ensure they are set correctly
-    // even if the context was just resumed. Using .value might fail in some browsers.
-    oscillator.frequency.setValueAtTime(chunk.frequency, now)
-    oscillator.detune.setValueAtTime(chunk.detune, now) // Apply detuning
-
-    // Create gain node with envelope
-    const gainNode = ctx.createGain()
-    gainNode.gain.setValueAtTime(0, now) // Start silent
-
-    // Connect nodes
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    // Calculate envelope timings
-    const attackTime = Math.min(0.01, duration * 0.2)
-    const releaseTime = Math.min(0.08, duration * 0.3)
-    const sustainDuration = Math.max(0, duration - attackTime - releaseTime) // Ensure non-negative sustain
-
-    // Apply envelope
-    if (duration > 0.02) {
-      // Standard envelope for longer sounds
-      gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
-      // Sustain phase: hold the magnitude
-      if (sustainDuration > 0.001) {
-        // Add a small threshold for sustain phase
-        gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainDuration)
-      }
-      // Release phase
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
-    } else {
-      // Simple linear ramp for very short clicks/sounds
-      gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
-      gainNode.gain.linearRampToValueAtTime(0, now + duration)
-    }
-
-    // Schedule oscillator start and stop
-    oscillator.start(now)
-    oscillator.stop(now + duration)
-
-    // Setup cleanup for when the sound finishes *playing*
-    // Use a promise to wait for onended or timeout
-    await new Promise<void>(resolve => {
-      let resolved = false
-      oscillator.onended = () => {
-        if (!resolved) {
-          oscillator.disconnect()
-          gainNode.disconnect()
-          resolved = true
-          resolve()
+        if (!resumed) {
+          // If still suspended after trying, don't attempt to play sound
+          console.warn(
+            `Audio playback skipped for chunk ${chunk.id} - context suspended after resume attempt.`
+          )
+          canPlayAudio = false
         }
+      } catch (resumeError) {
+        console.error(`Error attempting to resume audio context: ${resumeError}`)
+        canPlayAudio = false
       }
-      // Add a safety timeout slightly longer than duration, in case onended doesn't fire
-      setTimeout(
-        () => {
+    }
+
+    // Double-check the audio context state
+    if (ctx.state === 'suspended') {
+      console.warn(`Audio context still suspended after resume attempt for chunk ${chunk.id}`)
+      canPlayAudio = false
+
+      // Show visualizer dialog if requested and not already showing
+      if (persistVisualizer) {
+        audioManager.showVisualizerDialog()
+      }
+    }
+
+    // Only proceed with audio playback if the context is running
+    if (canPlayAudio && ctx.state === 'running') {
+      // --- Audio Playback Logic ---
+      const now = ctx.currentTime
+      const duration = chunk.duration / 1000 // Convert to seconds
+
+      // Create and configure oscillator
+      const oscillator = ctx.createOscillator()
+      oscillator.type = chunk.type
+      // Use setValueAtTime for frequency and detune to ensure they are set correctly
+      // even if the context was just resumed. Using .value might fail in some browsers.
+      oscillator.frequency.setValueAtTime(chunk.frequency, now)
+      oscillator.detune.setValueAtTime(chunk.detune, now) // Apply detuning
+
+      // Create gain node with envelope
+      const gainNode = ctx.createGain()
+      gainNode.gain.setValueAtTime(0, now) // Start silent
+
+      // Connect nodes
+      oscillator.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      // Calculate envelope timings
+      const attackTime = Math.min(0.01, duration * 0.2)
+      const releaseTime = Math.min(0.08, duration * 0.3)
+      const sustainDuration = Math.max(0, duration - attackTime - releaseTime) // Ensure non-negative sustain
+
+      // Apply envelope
+      if (duration > 0.02) {
+        // Standard envelope for longer sounds
+        gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
+        // Sustain phase: hold the magnitude
+        if (sustainDuration > 0.001) {
+          // Add a small threshold for sustain phase
+          gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainDuration)
+        }
+        // Release phase
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
+      } else {
+        // Simple linear ramp for very short clicks/sounds
+        gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
+        gainNode.gain.linearRampToValueAtTime(0, now + duration)
+      }
+
+      // Schedule oscillator start and stop
+      oscillator.start(now)
+      oscillator.stop(now + duration)
+
+      // Setup cleanup for when the sound finishes *playing*
+      // Use a promise to wait for onended or timeout
+      await new Promise<void>(resolve => {
+        let resolved = false
+        oscillator.onended = () => {
           if (!resolved) {
-            console.warn(
-              `Oscillator onended for chunk ${chunk.id} did not fire within expected time.`
-            )
-            try {
-              oscillator.disconnect()
-              gainNode.disconnect()
-            } catch (e) {
-              /* Ignore errors if already disconnected */
-              console.error(`Error disconnecting oscillator for chunk ${chunk.id}:`, e)
-            }
+            oscillator.disconnect()
+            gainNode.disconnect()
             resolved = true
             resolve()
           }
-        },
-        duration * 1000 + 100
-      ) // duration is already in sec, convert back to ms + buffer
-    })
+        }
+        // Add a safety timeout slightly longer than duration, in case onended doesn't fire
+        setTimeout(
+          () => {
+            if (!resolved) {
+              console.warn(
+                `Oscillator onended for chunk ${chunk.id} did not fire within expected time.`
+              )
+              try {
+                oscillator.disconnect()
+                gainNode.disconnect()
+              } catch (e) {
+                /* Ignore errors if already disconnected */
+                console.error(`Error disconnecting oscillator for chunk ${chunk.id}:`, e)
+              }
+              resolved = true
+              resolve()
+            }
+          },
+          duration * 1000 + 100
+        ) // duration is already in sec, convert back to ms + buffer
+      })
+    }
   } catch (err) {
     // Log errors related to audio playback setup or execution
     const message = err instanceof Error ? err.message : String(err)
     console.error(`Failed to play audio for chunk ${chunk.id}:`, message)
     // Don't re-throw here to allow other sounds in the sequence to potentially play
-    // throw new Error(`Failed to play audio: ${message}`) // Original behavior
   }
 }
 
@@ -242,6 +265,10 @@ export function sonifyChanges<T>(
   persistVisualizer: boolean = false
 ): void {
   try {
+    // Set the persistent visualizer flag on the AudioContextManager
+    const audioManager = AudioContextManager.getInstance()
+    audioManager.setPersistentVisualizer(persistVisualizer)
+
     const chunks = diffToSonic(diff, duration)
 
     if (chunks.length === 0) {

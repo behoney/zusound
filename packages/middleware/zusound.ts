@@ -3,6 +3,7 @@ import { type TraceOptions, type TraceData, trace } from '../core'
 import { Zusound, ZusoundOptions } from './types'
 import { isProduction } from './utils'
 import { sonifyChanges } from '../sonification'
+import { AudioContextManager } from '../sonification/utils'
 
 /**
  * zusound middleware for Zustand
@@ -31,6 +32,24 @@ export const zusound: Zusound = <
   // Check if we should run
   const inProduction = isProduction()
   const disable = enabled === false || (inProduction && !allowInProduction)
+
+  // Initialize AudioContextManager with persistVisualizer setting if enabled
+  if (!disable && persistVisualizer && typeof window !== 'undefined') {
+    // Initialize the AudioContextManager and set the persistent visualizer flag
+    // This ensures the visualizer is properly configured even before any state changes
+    setTimeout(() => {
+      try {
+        const audioManager = AudioContextManager.getInstance()
+        audioManager.setPersistentVisualizer(persistVisualizer)
+
+        // Also get the context to ensure it's initialized. This will
+        // also initialize the Visualizer singleton.
+        audioManager.getContext()
+      } catch (error) {
+        console.error('Error initializing AudioContext with persistVisualizer:', error)
+      }
+    }, 0)
+  }
 
   if (disable) {
     // If disabled, remove the  type from Mps and return
