@@ -15,21 +15,21 @@ const exampleLinks: ExampleLink[] = [
     title: 'Basic Usage',
     description: 'Demonstrates fundamental integration with two simple stores, showcasing sound feedback for various data types (number, string, boolean, object property addition). Includes source code viewer.',
     path: '/basic',
-    image: `${import.meta.env.BASE_URL || '/'}screenshots/basic-usage.png`,
+    image: `${import.meta.env.BASE_URL}examples/assets/basic-usage.png`,
   },
   {
     id: 'todo',
     title: 'Todo App',
     description: 'A more complex app with multiple stores (Todos, Filter, Input, Time). Shows sounds for array operations (add, toggle, delete), simple value changes (filter), and rapid updates (visual sort). Includes source code viewer.',
     path: '/todo',
-    image: `${import.meta.env.BASE_URL || '/'}screenshots/todo-app.png`,
+    image: `${import.meta.env.BASE_URL}examples/assets/todo.png`,
   },
   {
     id: 'middlewares',
     title: 'Middleware Compatibility',
     description: 'Shows how to correctly compose zusound with other common Zustand middlewares like immer, persist, and devtools. Includes source code viewer.',
     path: '/middlewares',
-    image: `${import.meta.env.BASE_URL || '/'}screenshots/middlewares.png`,
+    image: `${import.meta.env.BASE_URL}examples/assets/middlewares.png`,
   },
 ]
 
@@ -79,16 +79,25 @@ export function ExampleIndex() {
       </div>
 
       <footer className="mt-12 text-center text-gray-500 text-sm">
-        <p>
+        <div className="flex flex-col items-center space-y-3">
+          <p className="text-base">
+            Enjoying zusound? Support the project by giving it a star!
+          </p>
           <a
             href="https://github.com/behoney/zusound"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-blue-600 hover:text-blue-700"
+            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-md hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
           >
-            View on GitHub
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+            </svg>
+            Star on GitHub
           </a>
-        </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Your support helps us improve zusound and build more features!
+          </p>
+        </div>
       </footer> 
     </div>
   )
