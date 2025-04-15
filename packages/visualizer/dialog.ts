@@ -1,5 +1,3 @@
-import { AudioContextManager } from '../sonification/utils'
-
 // Define a minimal interface for the Visualizer to avoid circular imports
 interface IVisualizer {
   initialize(): boolean
@@ -18,7 +16,7 @@ export function getVisualizer(): IVisualizer {
 let audioBlockedDialog: HTMLDialogElement | null = null
 let visualizerCanvasContainer: HTMLDivElement | null = null
 let isDialogVisible = false
-let interactionListenerCleanup: (() => void) | null = null
+const interactionListenerCleanup: (() => void) | null = null
 
 // Persistent corner visualizer
 let persistentContainer: HTMLDivElement | null = null
@@ -41,22 +39,6 @@ const dialogStyle = `
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%); /* Center on screen */
-    `
-
-/** Style for the enable button */
-const enableButtonStyle = `
-    background: linear-gradient(to right, #6366f1, #a855f7);
-    border: none;
-    border-radius: 6px;
-    color: white;
-    padding: 10px 20px;
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.2s ease-in-out;
-    display: block;
-    width: 80%;
-    margin: 18px auto 10px auto; /* Adjusted margin */
     `
 
 /** Style for the close button */
@@ -227,31 +209,6 @@ export function showAudioBlockedDialog(): void {
   message.style.cssText = 'margin: 0 0 18px 0; font-size: 14px; line-height: 1.5;'
   audioBlockedDialog.appendChild(message)
 
-  // --- Enable Audio Button ---
-  const enableButton = document.createElement('button')
-  enableButton.textContent = 'Enable Audio'
-  enableButton.style.cssText = enableButtonStyle
-  enableButton.addEventListener('mouseover', () => (enableButton.style.transform = 'scale(1.03)'))
-  enableButton.addEventListener('mouseout', () => (enableButton.style.transform = 'scale(1.0)'))
-  enableButton.addEventListener('click', async () => {
-    const audioManager = AudioContextManager.getInstance()
-    const { resumed } = await audioManager.tryResumeAudioContext()
-    if (resumed) {
-      closeAudioBlockedDialog() // Close dialog on success
-    } else {
-      // Optional: Feedback if enabling fails (e.g., shake)
-      audioBlockedDialog?.animate(
-        [
-          { transform: 'translateX(-5px)' },
-          { transform: 'translateX(5px)' },
-          { transform: 'translateX(0)' },
-        ],
-        { duration: 300, easing: 'ease-in-out' }
-      )
-    }
-  })
-  audioBlockedDialog.appendChild(enableButton)
-
   // --- Close Button ---
   const closeButton = document.createElement('button')
   closeButton.innerHTML = '&times;'
@@ -276,33 +233,6 @@ export function showAudioBlockedDialog(): void {
   document.body.appendChild(audioBlockedDialog)
   audioBlockedDialog.showModal()
   isDialogVisible = true
-
-  // --- Add Interaction Listener ---
-  // This listener tries to resume audio on any interaction *outside* the dialog
-  const userInteractionListener = async (event: Event) => {
-    if (audioBlockedDialog?.contains(event.target as Node)) {
-      return // Ignore clicks inside the dialog
-    }
-    const audioManager = AudioContextManager.getInstance()
-    const { resumed } = await audioManager.tryResumeAudioContext()
-    if (resumed) {
-      closeAudioBlockedDialog() // Close dialog if interaction resumes audio
-      // Cleanup handled in closeAudioBlockedDialog
-    }
-  }
-
-  // Use capture phase for broader detection, but only listen once per type
-  document.addEventListener('click', userInteractionListener, { capture: true, once: false })
-  document.addEventListener('keydown', userInteractionListener, { capture: true, once: false })
-  document.addEventListener('touchstart', userInteractionListener, { capture: true, once: false })
-
-  // Store cleanup function for these listeners
-  interactionListenerCleanup = () => {
-    document.removeEventListener('click', userInteractionListener, { capture: true })
-    document.removeEventListener('keydown', userInteractionListener, { capture: true })
-    document.removeEventListener('touchstart', userInteractionListener, { capture: true })
-    interactionListenerCleanup = null // Mark as cleaned up
-  }
 }
 
 /** Closes and cleans up the audio blocked dialog. */
