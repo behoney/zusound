@@ -7,13 +7,13 @@
  */
 
 // Export middleware (recommended entry point)
-export * from './middleware'
+export * from './middleware/index'
 
 // Export sonification utilities (for advanced use)
-export * from './sonification'
+export * from './sonification/index'
 
 // Export diff utilities (primarily for custom diff functions)
-export * from './diff'
+export * from './diff/index'
 
 // Export visualizer controls (for manual UI management)
 // These are also exported from './middleware' for convenience
@@ -21,7 +21,7 @@ export {
   showPersistentVisualizer,
   hidePersistentVisualizer,
   visualizeSonicChunk, // Added export for manual visualization trigger
-} from './visualizer'
+} from './visualizer/index'
 
 // Export core types that might be needed (e.g., for custom onTrace)
-export type { TraceData } from './core'
+export type { TraceData } from './core/index'
