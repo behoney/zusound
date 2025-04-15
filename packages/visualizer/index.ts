@@ -2,10 +2,10 @@
 // Renders visualization to a canvas based on 'zusound' events.
 
 import type { SonicChunk } from '../sonification'
-import type { ZusoundEvent, ZusoundEventDetail } from './types'
+import type { ZusoundEvent, ZusoundEventDetail } from '../types/visualizer'
 
 // Export core types
-export * from './types'
+export * from '../types/visualizer'
 // Export persistent UI functions directly
 export { showPersistentVisualizer, hidePersistentVisualizer } from './dialog'
 
