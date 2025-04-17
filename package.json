@@ -1,6 +1,6 @@
 {
   "name": "zusound",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Sound feedback middleware for Zustand state management",
   "type": "module",
   "main": "./dist/zusound.umd.js",
@@ -46,7 +46,11 @@
     "type": "git",
     "url": "git+https://github.com/behoney/zusound.git"
   },
-  "homepage": "https://www.npmjs.com/package/zusound",
+  "homepage": "https://behoney.github.io/zusound/",
+  "bugs": {
+    "url": "https://github.com/behoney/zusound/issues"
+  },
+  "npm": "https://www.npmjs.com/package/zusound",
   "dependencies": {
     "zustand": "^5.0.3"
   },
