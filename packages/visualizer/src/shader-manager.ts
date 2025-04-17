@@ -1,4 +1,4 @@
-import type { SonicChunk } from '../../sonification'
+import type { SonicChunk } from '../../shared-types'
 import { MAX_VISIBLE_EVENTS } from './config'
 import { VisualizerEvent } from './visualizer-core'
 

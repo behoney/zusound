@@ -1,4 +1,4 @@
-import type { SonicChunk } from '../sonification'
+import type { SonicChunk } from '../shared-types'
 
 /**
  * Interface for the custom event detail payload

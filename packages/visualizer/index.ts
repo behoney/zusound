@@ -1,6 +1,6 @@
 // Public API for the zusound visualizer package
 
-import { SonicChunk } from '../sonification'
+import { SonicChunk } from '../shared-types'
 import { Visualizer } from './src/visualizer-core' // Import the core singleton class
 import type { ZusoundEventDetail } from './types' // Import event detail type
 

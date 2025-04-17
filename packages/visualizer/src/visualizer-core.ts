@@ -1,4 +1,4 @@
-import type { SonicChunk } from '../../sonification'
+import type { SonicChunk } from '../../shared-types'
 import type { ZusoundEvent } from '../types'
 import { VisualizerShaderManager } from './shader-manager'
 import { EVENT_LIFETIME_MS, MAX_VISIBLE_EVENTS, VISUALIZER_SIZE } from './config'

@@ -6,6 +6,9 @@
  * for advanced use cases.
  */
 
+// Export shared types used across packages
+export * from './shared-types/index'
+
 // Export middleware (recommended entry point)
 export * from './middleware/index'
 

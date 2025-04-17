@@ -1,7 +1,6 @@
 import { SonicChunk } from './types'
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager, simpleHash } from './utils'
-import { ZusoundEventDetail } from '../visualizer'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -117,7 +116,7 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 
     // Dispatch custom event for visualizer *before* attempting playback
     if (typeof window !== 'undefined') {
-      const event = new CustomEvent<ZusoundEventDetail>('zusound', {
+      const event = new CustomEvent('zusound', {
         detail: { chunk },
       })
       window.dispatchEvent(event)
