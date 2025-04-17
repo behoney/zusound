@@ -1,5 +1,3 @@
-import { Visualizer } from '../visualizer'
-
 /**
  * Class to manage the lifecycle of a single AudioContext instance.
  */
@@ -50,10 +48,6 @@ export class AudioContextManager {
           : { latencyHint: 'interactive' } // Request lower latency before interaction
 
         this.audioContext = new AudioContext(contextOptions)
-
-        // Ensure Visualizer singleton is instantiated/ready
-        // This is important even if we don't manage its UI here
-        Visualizer.getInstance()
 
         // If the context *immediately* starts suspended (can happen), mark as blocked
         if (this.audioContext.state === 'suspended') {
