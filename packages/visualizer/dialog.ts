@@ -1,24 +1,13 @@
-import { AudioContextManager } from '../sonification/utils'
+import { Visualizer } from './src/visualizer-core' // Import the core class
+import { AudioContextManager } from '../sonification/utils' // Import AudioContextManager
 
-// Define a minimal interface for the Visualizer to avoid circular imports
-interface IVisualizer {
-  initialize(): boolean
-  getCanvasElement(): HTMLCanvasElement | null
-  notifyMounted(): void
-  notifyUnmounted(): void
-}
-
-// Export getVisualizer function to access the Visualizer singleton
-// without direct import from index.ts
-export function getVisualizer(): IVisualizer {
-  // This will be defined in index.ts to avoid circular dependencies
-  return globalThis.__VISUALIZER_SINGLETON__ as IVisualizer
-}
+// No longer need getVisualizer or __VISUALIZER_SINGLETON__
 
 let audioBlockedDialog: HTMLDialogElement | null = null
 let visualizerCanvasContainer: HTMLDivElement | null = null
 let isDialogVisible = false
-let interactionListenerCleanup: (() => void) | null = null
+// Remove interactionListenerCleanup as it's not used and declared null
+// const interactionListenerCleanup: (() => void) | null = null;
 
 // Persistent corner visualizer
 let persistentContainer: HTMLDivElement | null = null
@@ -41,22 +30,6 @@ const dialogStyle = `
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%); /* Center on screen */
-    `
-
-/** Style for the enable button */
-const enableButtonStyle = `
-    background: linear-gradient(to right, #6366f1, #a855f7);
-    border: none;
-    border-radius: 6px;
-    color: white;
-    padding: 10px 20px;
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.2s ease-in-out;
-    display: block;
-    width: 80%;
-    margin: 18px auto 10px auto; /* Adjusted margin */
     `
 
 /** Style for the close button */
@@ -83,19 +56,23 @@ const closeButtonStyle = `
 /** Shows a persistent visualizer in the top-right corner of the screen */
 export function showPersistentVisualizer(): void {
   if (isPersistentVisible || typeof document === 'undefined') {
-    return // Don't create multiple instances
+    return // Don't create multiple instances or run outside browser
   }
 
-  const visualizer = getVisualizer()
-  if (!visualizer || !visualizer.initialize()) {
-    console.error('Visualizer unavailable. Cannot show persistent UI.')
-    return
-  }
+  // Get the singleton instance
+  const visualizer = Visualizer.getInstance()
 
-  const visualizerCanvas = visualizer.getCanvasElement()
+  // Ensure initialized and get canvas
+  const visualizerCanvas = visualizer.getCanvasElement() // This implicitly initializes if needed
   if (!visualizerCanvas) {
     console.error('Visualizer canvas unavailable. Cannot show persistent UI.')
     return
+  }
+
+  // If canvas is currently in the dialog, remove it first
+  if (isDialogVisible && audioBlockedDialog && audioBlockedDialog.contains(visualizerCanvas)) {
+    visualizer.notifyUnmounted() // Tell visualizer its canvas is leaving the dialog
+    visualizerCanvasContainer?.removeChild(visualizerCanvas)
   }
 
   // Create floating container
@@ -146,12 +123,12 @@ export function hidePersistentVisualizer(): void {
     return
   }
 
-  const visualizer = getVisualizer()
-  const canvas = visualizer?.getCanvasElement() // Use optional chaining
+  const visualizer = Visualizer.getInstance()
+  const canvas = visualizer.getCanvasElement()
 
   // Notify visualizer its canvas is being removed
   if (canvas && persistentContainer.contains(canvas)) {
-    visualizer?.notifyUnmounted()
+    visualizer.notifyUnmounted()
   }
 
   // Remove from DOM
@@ -169,14 +146,9 @@ export function showAudioBlockedDialog(): void {
     return // Don't show if already visible or not in browser
   }
 
-  const visualizer = getVisualizer()
-  // Ensure visualizer is ready before proceeding
-  if (!visualizer.initialize()) {
-    console.error('Visualizer failed to initialize. Cannot show dialog.')
-    return
-  }
+  const visualizer = Visualizer.getInstance()
+  const visualizerCanvas = visualizer.getCanvasElement() // Ensures initialization
 
-  const visualizerCanvas = visualizer.getCanvasElement()
   if (!visualizerCanvas) {
     console.error('Visualizer canvas not available for dialog.')
     return
@@ -188,7 +160,7 @@ export function showAudioBlockedDialog(): void {
     persistentContainer &&
     persistentContainer.contains(visualizerCanvas)
   ) {
-    visualizer.notifyUnmounted() // Tell visualizer its canvas is leaving the DOM
+    visualizer.notifyUnmounted() // Tell visualizer its canvas is leaving the persistent container
     persistentContainer.removeChild(visualizerCanvas)
   }
 
@@ -207,18 +179,17 @@ export function showAudioBlockedDialog(): void {
   visualizerCanvasContainer = document.createElement('div')
   visualizerCanvasContainer.style.cssText = `
     margin-bottom: 16px;
-    height: ${visualizerCanvas.height}px;
+    height: ${visualizerCanvas.height}px; /* Use canvas height */
     display: flex;
     justify-content: center;
     align-items: center;
   `
-  // Style canvas for dialog context
-  visualizerCanvas.style.margin = '0' // Ensure no extra margin inside container
+  visualizerCanvas.style.margin = '0 auto' // Center canvas horizontally
   visualizerCanvas.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)' // Add shadow directly
 
   visualizerCanvasContainer.appendChild(visualizerCanvas)
   audioBlockedDialog.appendChild(visualizerCanvasContainer)
-  visualizer.notifyMounted() // Tell visualizer it's in the DOM
+  visualizer.notifyMounted() // Tell visualizer it's in the DOM (dialog)
 
   // --- Message ---
   const message = document.createElement('p')
@@ -226,31 +197,6 @@ export function showAudioBlockedDialog(): void {
     'Audio feedback is currently blocked by your browser. <br/> Click the button below or interact with the page to enable sound.'
   message.style.cssText = 'margin: 0 0 18px 0; font-size: 14px; line-height: 1.5;'
   audioBlockedDialog.appendChild(message)
-
-  // --- Enable Audio Button ---
-  const enableButton = document.createElement('button')
-  enableButton.textContent = 'Enable Audio'
-  enableButton.style.cssText = enableButtonStyle
-  enableButton.addEventListener('mouseover', () => (enableButton.style.transform = 'scale(1.03)'))
-  enableButton.addEventListener('mouseout', () => (enableButton.style.transform = 'scale(1.0)'))
-  enableButton.addEventListener('click', async () => {
-    const audioManager = AudioContextManager.getInstance()
-    const { resumed } = await audioManager.tryResumeAudioContext()
-    if (resumed) {
-      closeAudioBlockedDialog() // Close dialog on success
-    } else {
-      // Optional: Feedback if enabling fails (e.g., shake)
-      audioBlockedDialog?.animate(
-        [
-          { transform: 'translateX(-5px)' },
-          { transform: 'translateX(5px)' },
-          { transform: 'translateX(0)' },
-        ],
-        { duration: 300, easing: 'ease-in-out' }
-      )
-    }
-  })
-  audioBlockedDialog.appendChild(enableButton)
 
   // --- Close Button ---
   const closeButton = document.createElement('button')
@@ -268,53 +214,53 @@ export function showAudioBlockedDialog(): void {
     closeButton.style.transform = 'scale(1.0)'
   })
   closeButton.addEventListener('click', () => {
+    // Attempt to resume audio context on close click
+    // This click provides the necessary user interaction.
+    AudioContextManager.getInstance()
+      .tryResumeAudioContext()
+      .catch(err => console.warn('Error attempting to resume audio on dialog close:', err))
     closeAudioBlockedDialog()
   })
   audioBlockedDialog.appendChild(closeButton)
 
   // --- Append and Show ---
   document.body.appendChild(audioBlockedDialog)
-  audioBlockedDialog.showModal()
-  isDialogVisible = true
-
-  // --- Add Interaction Listener ---
-  // This listener tries to resume audio on any interaction *outside* the dialog
-  const userInteractionListener = async (event: Event) => {
-    if (audioBlockedDialog?.contains(event.target as Node)) {
-      return // Ignore clicks inside the dialog
+  try {
+    audioBlockedDialog.showModal()
+    isDialogVisible = true
+  } catch (e) {
+    console.error('Failed to show audio blocked dialog:', e)
+    // Fallback or cleanup if showModal fails
+    if (audioBlockedDialog.parentNode) {
+      audioBlockedDialog.parentNode.removeChild(audioBlockedDialog)
     }
-    const audioManager = AudioContextManager.getInstance()
-    const { resumed } = await audioManager.tryResumeAudioContext()
-    if (resumed) {
-      closeAudioBlockedDialog() // Close dialog if interaction resumes audio
-      // Cleanup handled in closeAudioBlockedDialog
+    audioBlockedDialog = null
+    visualizerCanvasContainer = null
+    // Ensure canvas is put back if removed
+    if (
+      isPersistentVisible &&
+      visualizerCanvas && // Use visualizerCanvas here as canvas might not be declared
+      persistentContainer &&
+      !persistentContainer.contains(visualizerCanvas)
+    ) {
+      persistentContainer.appendChild(visualizerCanvas)
+      visualizer.notifyMounted()
     }
-  }
-
-  // Use capture phase for broader detection, but only listen once per type
-  document.addEventListener('click', userInteractionListener, { capture: true, once: false })
-  document.addEventListener('keydown', userInteractionListener, { capture: true, once: false })
-  document.addEventListener('touchstart', userInteractionListener, { capture: true, once: false })
-
-  // Store cleanup function for these listeners
-  interactionListenerCleanup = () => {
-    document.removeEventListener('click', userInteractionListener, { capture: true })
-    document.removeEventListener('keydown', userInteractionListener, { capture: true })
-    document.removeEventListener('touchstart', userInteractionListener, { capture: true })
-    interactionListenerCleanup = null // Mark as cleaned up
   }
 }
 
 /** Closes and cleans up the audio blocked dialog. */
 export function closeAudioBlockedDialog(): void {
+  // Moved declarations higher up
+  const visualizer = Visualizer.getInstance()
+  const canvas = visualizer.getCanvasElement() // Get canvas reference
+
   if (!isDialogVisible || !audioBlockedDialog) {
     return
   }
 
-  const visualizer = getVisualizer()
-  const canvas = visualizer.getCanvasElement()
-
   // Notify visualizer its canvas is being removed from dialog
+  // Check if canvas exists before using it
   if (canvas && audioBlockedDialog.contains(canvas)) {
     visualizer.notifyUnmounted()
   }
@@ -326,15 +272,24 @@ export function closeAudioBlockedDialog(): void {
     audioBlockedDialog.parentNode.removeChild(audioBlockedDialog)
   }
 
-  // Clean up document-level interaction listeners
-  if (interactionListenerCleanup) {
-    interactionListenerCleanup()
-  }
+  // Clean up document-level interaction listeners if they were added
+  // Removed as interactionListenerCleanup was unused
+  // if (interactionListenerCleanup) {
+  //   interactionListenerCleanup();
+  // }
 
-  // If persistent visualizer was enabled, re-add canvas to it
+  // If persistent visualizer was enabled, re-add canvas to its container
+  // Check if persistentContainer still exists and canvas is valid
   if (isPersistentVisible && canvas && persistentContainer) {
-    persistentContainer.appendChild(canvas)
-    visualizer.notifyMounted()
+    // Ensure canvas isn't already back in the persistent container
+    if (!persistentContainer.contains(canvas)) {
+      persistentContainer.appendChild(canvas)
+      visualizer.notifyMounted() // Notify mounted in persistent container
+    }
+  } else if (canvas && !isPersistentVisible) {
+    // If persistent wasn't the target, but the canvas exists,
+    // it might need explicit cleanup or detachment?
+    // Currently, we assume it either goes back to persistent or is implicitly handled.
   }
 
   audioBlockedDialog = null

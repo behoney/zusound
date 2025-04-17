@@ -28,4 +28,6 @@ export default defineConfig({
   shims: true,
   // Set this to handle browser/node environments properly
   platform: 'neutral',
+  // Explicitly specify the tsconfig file for the build
+  tsconfig: 'tsconfig.build.json', // <--- Explicitly use the build tsconfig
 })

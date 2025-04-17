@@ -15,13 +15,13 @@
 // Import the implementation function
 import { traceImpl as traceMiddlewareImpl } from './traceMiddleware'
 // Import the public type definition and other necessary types
-import type { Trace, TraceOptions, TraceData } from './types' // DiffResult now imported within types.d.ts
+import type { Trace, TraceOptions, TraceData, ZusoundTraceEventDetail } from './types' // DiffResult now imported within types.d.ts
 import type { DiffResult } from '../diff' // Explicitly import DiffResult for re-export if needed
 
 // Export the implementation but assert its type to the public Trace signature
 export const trace = traceMiddlewareImpl as Trace
 
 // Re-export types for consumers of the core package
-export type { TraceOptions, TraceData, Trace, TraceImpl } from './types'
+export type { TraceOptions, TraceData, Trace, TraceImpl, ZusoundTraceEventDetail } from './types'
 // Re-export DiffResult from its source package
 export type { DiffResult } from '../diff'

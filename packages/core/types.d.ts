@@ -35,6 +35,11 @@ export interface TraceData<T = unknown> {
   duration: number
 }
 
+/** Detail payload for the trace event */
+export interface ZusoundTraceEventDetail<T = unknown> {
+  traceData: TraceData<T>
+}
+
 /** Configuration options for the trace middleware. */
 export interface TraceOptions<T> {
   /**

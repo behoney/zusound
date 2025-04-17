@@ -11,21 +11,71 @@
  *
  * Basic usage:
  * ```
- * import { sonifyChanges } from "@zusound/sonification";
+ * // Automatically initialized when using the middleware (default behavior)
+ * import { zusound } from "zusound";
  *
- * // When state changes occur:
- * sonifyChanges(stateChanges, 200); // Play sounds with 200ms duration
+ * // For manual initialization:
+ * import { initSonificationListener } from "zusound";
+ * initSonificationListener();
  * ```
  */
+
+import type { ZusoundTraceEventDetail } from '../core'
+import { sonifyChanges as internalSonifyChanges } from './sonification'
 
 // Core sonification functions
 export { sonifyChanges, playSonicChunk } from './sonification'
 
-// Types
-export type { SonicChunk } from './types'
+// Types (SonicChunk is exported from the main index.ts via shared-types)
+// export type { SonicChunk } from './types' // <-- REMOVE THIS LINE
 
 // Utilities
 export { AudioContextManager } from './utils'
 
 // Constants (for advanced configuration)
 export { AUDIO_CONFIG } from './constants'
+
+/**
+ * Handles the trace event and triggers sonification.
+ */
+function handleTraceEvent(event: Event): void {
+  // Type guard using CustomEvent and detail structure
+  if (event instanceof CustomEvent && event.type === 'zusound:trace' && event.detail?.traceData) {
+    // Cast detail to the imported type
+    const detail = event.detail as ZusoundTraceEventDetail<unknown>
+    const traceData = detail.traceData
+    const { diff, duration } = traceData
+
+    // Based on DiffResult type definition in packages/diff/types.d.ts,
+    // for object types it's Partial<T>
+    if (diff && typeof diff === 'object') {
+      internalSonifyChanges(diff as Partial<unknown>, duration)
+    }
+  }
+}
+
+/**
+ * Initializes the sonification event listener.
+ * Call this function during app setup to start listening for state change events.
+ *
+ * Note: This is automatically called by the middleware unless
+ * { initSonification: false } is specified in the options.
+ */
+export function initSonificationListener(): void {
+  if (typeof window !== 'undefined') {
+    // Remove any existing listener to prevent duplicates
+    window.removeEventListener('zusound:trace', handleTraceEvent)
+    // Add the listener
+    window.addEventListener('zusound:trace', handleTraceEvent)
+  }
+}
+
+/**
+ * Removes the sonification event listener.
+ * Call this function to stop listening for state change events.
+ */
+export function removeSonificationListener(): void {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('zusound:trace', handleTraceEvent)
+  }
+}

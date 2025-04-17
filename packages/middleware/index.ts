@@ -12,6 +12,7 @@
 
 import type { Zusound, ZusoundOptions } from './types'
 import { zusound } from './zusound'
+import type { ZusoundTraceEvent } from './zusound'
 
 // Augment ImportMeta to support Vite's environment variables
 declare global {
@@ -23,8 +24,5 @@ declare global {
   }
 }
 
-export type { Zusound, ZusoundOptions }
+export type { Zusound, ZusoundOptions, ZusoundTraceEvent }
 export { zusound }
-
-// Also export the visualizer control functions from zusound.ts
-export { showPersistentVisualizer, hidePersistentVisualizer } from '../visualizer'

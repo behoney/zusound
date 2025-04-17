@@ -1,27 +1,34 @@
 /**
  * Main entry point for the zusound library.
  *
- * Recommended usage is via the `zusound` middleware.
- * Other exports like `sonifyChanges` or visualizer controls are available
- * for advanced use cases.
+ * Recommended usage pattern:
+ * 1. Import and apply the `zusound` middleware to your Zustand store
+ *    - Sonification is automatically initialized by default
+ *    - Use { initSonification: false } to disable automatic initialization
+ * 2. For advanced control, manually initialize sonification and visualization
  */
 
-// Export middleware (recommended entry point)
-export * from './middleware'
+// Export shared types used across packages
+export * from './shared-types/index' // This now correctly exports SonicChunk without conflict
+// Explicitly re-export SonicChunk to fix ambiguity <-- REMOVE THIS LINE
+// export type { SonicChunk } from './shared-types/sonic-chunk' // <-- REMOVE THIS LINE
 
-// Export sonification utilities (for advanced use)
-export * from './sonification'
+// Export middleware (recommended entry point for Zustand enhancement)
+export * from './middleware/index'
+
+// Export sonification utilities (for initialization and advanced use)
+export * from './sonification/index' // This no longer exports SonicChunk
 
 // Export diff utilities (primarily for custom diff functions)
-export * from './diff'
+export * from './diff/index'
 
 // Export visualizer controls (for manual UI management)
-// These are also exported from './middleware' for convenience
 export {
   showPersistentVisualizer,
   hidePersistentVisualizer,
-  visualizeSonicChunk, // Added export for manual visualization trigger
-} from './visualizer'
+  visualizeSonicChunk,
+  ensureVisualizerReady,
+} from './visualizer/index'
 
 // Export core types that might be needed (e.g., for custom onTrace)
-export type { TraceData } from './core'
+export type { TraceData, ZusoundTraceEventDetail } from './core/index'
