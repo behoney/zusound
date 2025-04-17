@@ -13,7 +13,7 @@
  * ```
  * // Automatically initialized when using the middleware (default behavior)
  * import { zusound } from "zusound";
- * 
+ *
  * // For manual initialization:
  * import { initSonificationListener } from "zusound";
  * initSonificationListener();
@@ -26,8 +26,8 @@ import { sonifyChanges as internalSonifyChanges } from './sonification'
 // Core sonification functions
 export { sonifyChanges, playSonicChunk } from './sonification'
 
-// Types
-export type { SonicChunk } from './types'
+// Types (SonicChunk is exported from the main index.ts via shared-types)
+// export type { SonicChunk } from './types' // <-- REMOVE THIS LINE
 
 // Utilities
 export { AudioContextManager } from './utils'

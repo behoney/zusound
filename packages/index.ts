@@ -9,15 +9,15 @@
  */
 
 // Export shared types used across packages
-export * from './shared-types/index'
-// Explicitly re-export SonicChunk to fix ambiguity
-export type { SonicChunk } from './shared-types/sonic-chunk'
+export * from './shared-types/index' // This now correctly exports SonicChunk without conflict
+// Explicitly re-export SonicChunk to fix ambiguity <-- REMOVE THIS LINE
+// export type { SonicChunk } from './shared-types/sonic-chunk' // <-- REMOVE THIS LINE
 
 // Export middleware (recommended entry point for Zustand enhancement)
 export * from './middleware/index'
 
 // Export sonification utilities (for initialization and advanced use)
-export * from './sonification/index'
+export * from './sonification/index' // This no longer exports SonicChunk
 
 // Export diff utilities (primarily for custom diff functions)
 export * from './diff/index'
