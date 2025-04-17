@@ -46,8 +46,8 @@ const VisualizerExample: React.FC = () => {
         <div className="card-body">
           <h2 className="card-title">Demonstration</h2>
           <p className="card-description">
-            This example shows how to control the visibility of the persistent visualizer UI provided
-            by `zusound`.
+            This example shows how to control the visibility of the persistent visualizer UI
+            provided by `zusound`.
           </p>
           <p className="mb-4">
             The persistent visualizer displays feedback for sonified state changes in a corner or
@@ -76,11 +76,7 @@ const VisualizerExample: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-4 mb-6 border-t pt-4 mt-4">
-            <button
-              onClick={decrement}
-              className="btn btn-primary"
-              aria-label="Decrement count"
-            >
+            <button onClick={decrement} className="btn btn-primary" aria-label="Decrement count">
               Decrement
             </button>
 
@@ -88,19 +84,11 @@ const VisualizerExample: React.FC = () => {
               {count}
             </div>
 
-            <button
-              onClick={increment}
-              className="btn btn-primary"
-              aria-label="Increment count"
-            >
+            <button onClick={increment} className="btn btn-primary" aria-label="Increment count">
               Increment
             </button>
 
-            <button
-              onClick={reset}
-              className="btn btn-danger ml-4"
-              aria-label="Reset count"
-            >
+            <button onClick={reset} className="btn btn-danger ml-4" aria-label="Reset count">
               Reset
             </button>
           </div>
