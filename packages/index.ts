@@ -10,6 +10,8 @@
 
 // Export shared types used across packages
 export * from './shared-types/index'
+// Explicitly re-export SonicChunk to fix ambiguity
+export type { SonicChunk } from './shared-types/sonic-chunk'
 
 // Export middleware (recommended entry point for Zustand enhancement)
 export * from './middleware/index'
