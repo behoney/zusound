@@ -3,8 +3,8 @@ import type { TraceOptions, TraceData } from '../core' // Core trace functionali
 import { trace } from '../core' // Core trace functionality
 import type { Zusound, ZusoundOptions } from './types' // Middleware-specific types
 import { isProduction } from './utils' // Utility functions
-// REMOVE direct import of sonifyChanges
-// import { sonifyChanges } from '../sonification'
+// Import the initialization function but not the direct sonifyChanges
+import { initSonificationListener } from '../sonification'
 import {
   ensureVisualizerReady, // Keep for ensuring visualizer is ready if needed
   showPersistentVisualizer as showVisualizerUI, // Rename import for clarity
@@ -49,9 +49,8 @@ export const zusound: Zusound = <
     onTrace: userOnTrace, // User-defined callback *after* event dispatch
     diffFn, // Custom diff function
     persistVisualizer = false, // Option to show persistent UI on init
-    // Add options to control if default listeners should be initialized?
-    // initSonificationListener = true,
-    // initVisualizerListener = true,
+    // Add option to control if sonification listener should be initialized
+    initSonification = true, // Default to true for backward compatibility
     ...restOptions // Remaining options passed down to core trace
   } = options
 
@@ -63,19 +62,23 @@ export const zusound: Zusound = <
     return initializer as StateCreator<T, Mps, [...Mcs]>
   }
 
-  // Initialize visualizer UI if requested (runs once)
-  // Visualizer Core initialization and its own 'zusound' event listener
-  // are handled internally by the Visualizer singleton now.
+  // Initialize visualizer and sonification if requested (runs once)
   if (typeof window !== 'undefined') {
     // Use setTimeout to ensure DOM is ready and avoid blocking initial render
     setTimeout(() => {
       try {
+        // Initialize sonification listener if requested (default: true)
+        if (initSonification) {
+          initSonificationListener() // Ensure sonification listener is attached
+        }
+
+        // Initialize visualizer as before
         ensureVisualizerReady() // Ensures the visualizer singleton is initialized and listening
         if (persistVisualizer) {
           showVisualizerUI() // Show the persistent UI element
         }
       } catch (error) {
-        console.error('Error initializing visualizer UI:', error)
+        console.error('Error initializing audio/visual systems:', error)
       }
     }, 0)
   }
