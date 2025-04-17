@@ -26,5 +26,11 @@ export {
   visualizeSonicChunk, // Added export for manual visualization trigger
 } from './visualizer/index'
 
+// Export initialization functions for event-based approach
+export {
+  initSonificationListener,
+  cleanupSonificationListener,
+} from './sonification/index'
+
 // Export core types that might be needed (e.g., for custom onTrace)
 export type { TraceData } from './core/index'

@@ -3,16 +3,36 @@ import type { TraceOptions, TraceData } from '../core' // Core trace functionali
 import { trace } from '../core' // Core trace functionality
 import type { Zusound, ZusoundOptions } from './types' // Middleware-specific types
 import { isProduction } from './utils' // Utility functions
-import { sonifyChanges } from '../sonification' // Sonification function
+// REMOVE direct import of sonifyChanges
+// import { sonifyChanges } from '../sonification'
 import {
-  ensureVisualizerReady,
+  ensureVisualizerReady, // Keep for ensuring visualizer is ready if needed
   showPersistentVisualizer as showVisualizerUI, // Rename import for clarity
-  // hidePersistentVisualizer as hideVisualizerUI, // This function is not used locally
 } from '../visualizer' // Visualizer UI control
+
+// Define a type for the event detail
+export interface ZusoundTraceEventDetail<T = unknown> {
+  traceData: TraceData<T>
+}
+
+// Define the custom event type
+export type ZusoundTraceEvent<T = unknown> = CustomEvent<ZusoundTraceEventDetail<T>>
+
+/**
+ * Dispatches a trace event.
+ */
+function dispatchTraceEvent<T>(traceData: TraceData<T>): void {
+  if (typeof window !== 'undefined') {
+    const event = new CustomEvent<ZusoundTraceEventDetail<T>>('zusound:trace', {
+      detail: { traceData },
+    })
+    window.dispatchEvent(event)
+  }
+}
 
 /**
  * zusound middleware for Zustand
- * Applies state change sonification and optional visualization.
+ * Applies state change sonification and optional visualization via events.
  */
 export const zusound: Zusound = <
   T extends object,
@@ -26,9 +46,12 @@ export const zusound: Zusound = <
     enabled = !isProduction(),
     logDiffs = false,
     allowInProduction = false,
-    onTrace: userOnTrace, // User-defined callback after sonification
+    onTrace: userOnTrace, // User-defined callback *after* event dispatch
     diffFn, // Custom diff function
     persistVisualizer = false, // Option to show persistent UI on init
+    // Add options to control if default listeners should be initialized?
+    // initSonificationListener = true,
+    // initVisualizerListener = true,
     ...restOptions // Remaining options passed down to core trace
   } = options
 
@@ -40,28 +63,30 @@ export const zusound: Zusound = <
     return initializer as StateCreator<T, Mps, [...Mcs]>
   }
 
-  // Initialize visualizer and show persistent UI if requested (runs once)
+  // Initialize visualizer UI if requested (runs once)
+  // Visualizer Core initialization and its own 'zusound' event listener
+  // are handled internally by the Visualizer singleton now.
   if (typeof window !== 'undefined') {
     // Use setTimeout to ensure DOM is ready and avoid blocking initial render
     setTimeout(() => {
       try {
-        ensureVisualizerReady() // Ensures the visualizer singleton is initialized
+        ensureVisualizerReady() // Ensures the visualizer singleton is initialized and listening
         if (persistVisualizer) {
           showVisualizerUI() // Show the persistent UI element
         }
       } catch (error) {
-        console.error('Error initializing visualizer:', error)
+        console.error('Error initializing visualizer UI:', error)
       }
     }, 0)
   }
 
   // --- Custom trace processor (internal onTrace for core) ---
   const coreOnTrace = (traceData: TraceData<T>) => {
-    // 1. Perform Sonification
-    // SonifyChanges now dispatches events internally, visualizer listens separately.
-    sonifyChanges(traceData.diff, traceData.duration)
+    // 1. Dispatch the trace event (instead of directly calling sonifyChanges)
+    dispatchTraceEvent(traceData)
 
     // 2. Call user's onTrace callback if provided
+    // This now runs *after* the event is dispatched
     if (userOnTrace) {
       try {
         userOnTrace(traceData)
@@ -75,7 +100,7 @@ export const zusound: Zusound = <
   const traceOptions: TraceOptions<T> = {
     ...restOptions, // Pass down any remaining compatible options
     diffFn, // Pass down custom diff function if provided
-    onTrace: coreOnTrace, // Use the internal handler that triggers sonification & user callback
+    onTrace: coreOnTrace, // Use the internal handler that dispatches the event
   }
 
   // --- Setup Logging ---
@@ -91,7 +116,7 @@ export const zusound: Zusound = <
         // Push a copy to avoid mutation issues if traceData is modified later
         window['__zusound_logger__'].push({ ...traceData })
       }
-      // Call the original handler (which does sonification + user callback)
+      // Call the original handler (which dispatches event + user callback)
       originalCoreOnTrace(traceData)
     }
   }
