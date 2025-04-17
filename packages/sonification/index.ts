@@ -11,22 +11,20 @@
  *
  * Basic usage:
  * ```
- * // With event-based architecture:
- * import { initSonificationListener } from "@zusound/sonification";
- * initSonificationListener(); // Start listening for trace events
- *
- * // For direct manual control (legacy):
- * import { sonifyChanges } from "@zusound/sonification";
- * sonifyChanges(stateChanges, 200); // Play sounds with 200ms duration
+ * // Automatically initialized when using the middleware (default behavior)
+ * import { zusound } from "zusound";
+ * 
+ * // For manual initialization:
+ * import { initSonificationListener } from "zusound";
+ * initSonificationListener();
  * ```
  */
 
-// Import types
-import type { ZusoundTraceEvent } from '../middleware/zusound'
-import type { TraceData } from '../core'
+import type { ZusoundTraceEventDetail } from '../core'
+import { sonifyChanges as internalSonifyChanges } from './sonification'
 
-// Core sonification functions (internal)
-import { sonifyChanges as internalSonifyChanges, playSonicChunk } from './sonification'
+// Core sonification functions
+export { sonifyChanges, playSonicChunk } from './sonification'
 
 // Types
 export type { SonicChunk } from './types'
@@ -37,50 +35,47 @@ export { AudioContextManager } from './utils'
 // Constants (for advanced configuration)
 export { AUDIO_CONFIG } from './constants'
 
-// Flag to prevent multiple listener attachments
-let isListenerAttached = false
-
 /**
  * Handles the trace event and triggers sonification.
  */
 function handleTraceEvent(event: Event): void {
-  // Type guard
-  const zusoundEvent = event as ZusoundTraceEvent<unknown>
-  if (zusoundEvent.type === 'zusound:trace' && zusoundEvent.detail?.traceData) {
-    // Extract the diff and duration from the trace data
-    const traceData = zusoundEvent.detail.traceData as TraceData<unknown>
+  // Type guard using CustomEvent and detail structure
+  if (event instanceof CustomEvent && event.type === 'zusound:trace' && event.detail?.traceData) {
+    // Cast detail to the imported type
+    const detail = event.detail as ZusoundTraceEventDetail<unknown>
+    const traceData = detail.traceData
     const { diff, duration } = traceData
-    
-    // The diff property of TraceData is already of type DiffResult<T> which is compatible with Partial<T>
-    // This is safe to use with sonifyChanges which expects Partial<T>
-    internalSonifyChanges(diff as Partial<unknown>, duration)
+
+    // Based on DiffResult type definition in packages/diff/types.d.ts,
+    // for object types it's Partial<T>
+    if (diff && typeof diff === 'object') {
+      internalSonifyChanges(diff as Partial<unknown>, duration)
+    }
   }
 }
 
 /**
- * Initializes the sonification module by attaching the event listener.
- * Ensures the listener is attached only once.
+ * Initializes the sonification event listener.
+ * Call this function during app setup to start listening for state change events.
+ *
+ * Note: This is automatically called by the middleware unless
+ * { initSonification: false } is specified in the options.
  */
 export function initSonificationListener(): void {
-  if (isListenerAttached || typeof window === 'undefined') {
-    return
+  if (typeof window !== 'undefined') {
+    // Remove any existing listener to prevent duplicates
+    window.removeEventListener('zusound:trace', handleTraceEvent)
+    // Add the listener
+    window.addEventListener('zusound:trace', handleTraceEvent)
   }
-  window.addEventListener('zusound:trace', handleTraceEvent)
-  isListenerAttached = true
-  console.log('Zusound Sonification listener attached.')
 }
 
 /**
- * Detaches the event listener. Useful for cleanup.
+ * Removes the sonification event listener.
+ * Call this function to stop listening for state change events.
  */
-export function cleanupSonificationListener(): void {
-  if (!isListenerAttached || typeof window === 'undefined') {
-    return
+export function removeSonificationListener(): void {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('zusound:trace', handleTraceEvent)
   }
-  window.removeEventListener('zusound:trace', handleTraceEvent)
-  isListenerAttached = false
-  console.log('Zusound Sonification listener removed.')
 }
-
-// Expose the original sonifyChanges function for backwards compatibility and direct use
-export { internalSonifyChanges as sonifyChanges, playSonicChunk }

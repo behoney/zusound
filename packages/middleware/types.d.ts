@@ -26,12 +26,6 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
    */
   onTrace?: (traceData: TraceData<T>) => void
   /**
-   * Show a persistent visualizer UI in the corner of the screen (default: false).
-   * This simply shows/hides the UI element based on this flag initially.
-   * Manual control is available via `showPersistentVisualizer` / `hidePersistentVisualizer`.
-   */
-  persistVisualizer?: boolean
-  /**
    * Automatically initialize the sonification listener when middleware is used (default: true).
    * Set to false if you want to manually control when sonification starts using initSonificationListener.
    */
