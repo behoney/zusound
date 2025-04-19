@@ -71,3 +71,15 @@ export type TraceImpl = <T>(
   initializer: StateCreator<T, [], []>, // Implementation works on the base creator
   options?: TraceOptions<T>
 ) => StateCreator<T, [], []>
+
+export function zusound<
+  T extends object,
+  Mps extends [StoreMutatorIdentifier, unknown][] = [],
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+  U = T
+>(
+  initializer: StateCreator<T, Mps, Mcs, U>,
+  options: ZusoundOptions<T> = {}
+): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> {
+  // …your existing implementation…
+}

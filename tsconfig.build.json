@@ -20,9 +20,7 @@
     "outDir": "./dist",
     "rootDir": "packages",
     "paths": {
-      "*": [
-        "./*"
-      ]
+      "*": ["./*"]
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],

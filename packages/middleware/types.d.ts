@@ -1,7 +1,10 @@
-import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
+import type { StoreMutatorIdentifier as ZustandStoreMutatorIdentifier, StateCreator } from 'zustand'
 // Import TraceOptions and TraceData from core, DiffResult from diff
 import type { TraceOptions, TraceData } from '../core'
 import type { DiffResult } from '../diff'
+
+// Define the mutator type based on core/types.d.ts
+type ZusoundMutator = ['zustand/zusound', never]
 
 /**
  * Interface for zusound middleware options.
@@ -33,16 +36,35 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
 }
 
 /**
- * Type definition for the zusound middleware function.
- * This type captures the middleware's generic parameters and return type.
+ * Middleware entry function overloads for zusound.
  */
-export type Zusound = <
-  T extends object,
-  Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
->(
-  initializer: StateCreator<T, [...Mps] | [...Mps], Mcs>, // Adjusted Mps signature for compatibility
-  options?: ZusoundOptions<T>
-) => StateCreator<T, Mps, [...Mcs]>
+export interface Zusound {
+  /**
+   * Standalone usage: when no prior middlewares exist, preserve empty mutator lists.
+   */
+  <T extends object, U = T>(
+    initializer: StateCreator<T, [], [], U>,
+    options?: ZusoundOptions<T>
+  ): StateCreator<T, [], [], U>;
+
+  /**
+   * Composed usage: add 'zustand/zusound' mutator to existing mutator list.
+   */
+  <T extends object,
+    Mps extends [ZustandStoreMutatorIdentifier, unknown][],
+    Mcs extends [ZustandStoreMutatorIdentifier, unknown][],
+    U = T
+  >(
+    initializer: StateCreator<T, Mps, Mcs, U>,
+    options?: ZusoundOptions<T>
+  ): StateCreator<T, Mps, [...Mcs, ZusoundMutator], U>;
+}
+
+// Register 'zustand/zusound' mutator in Zustand's StoreMutators
+declare module 'zustand/vanilla' {
+  interface StoreMutators<S, _A> {
+    'zustand/zusound': S & (_A extends unknown[] ? unknown : never)
+  }
+}
 
 // Note: We don't need to re-import ZusoundOptions from './types' as it's defined here.

@@ -1,16 +1,15 @@
 import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
 import type { TraceOptions, TraceData, ZusoundTraceEventDetail } from '../core' // Import ZusoundTraceEventDetail from core
-import { trace } from '../core' // Core trace functionality
-import type { Zusound, ZusoundOptions } from './types' // Middleware-specific types
-import { isProduction } from './utils' // Utility functions
-import { initSonificationListener } from '../sonification' // Import for initialization but not direct calls
+import { trace } from '../core' // Core trace functionality (public Trace type)
+import type { ZusoundOptions } from './types' // Middleware-specific types
+import { isProduction } from './utils'
+import { initSonificationListener } from '../sonification' // Import for initialization
 
 // Define the custom event type using the detail from core
 export type ZusoundTraceEvent<T = unknown> = CustomEvent<ZusoundTraceEventDetail<T>>
 
 /**
  * Dispatches a trace event containing the trace data.
- * Visualizer and sonification components can listen for this event.
  */
 function dispatchTraceEvent<T>(traceData: TraceData<T>): void {
   if (typeof window !== 'undefined') {
@@ -21,54 +20,54 @@ function dispatchTraceEvent<T>(traceData: TraceData<T>): void {
   }
 }
 
-/**
- * zusound middleware for Zustand
- * Applies state change sonification and optional visualization.
- */
-export const zusound: Zusound = <
+// Define the mutator type locally using the literal for casting clarity
+type ZusoundMutatorTuple = ['zustand/zusound', never]
+
+export function zusound<
   T extends object,
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+  U = T
 >(
-  initializer: StateCreator<T, [...Mps], Mcs>,
+  initializer: StateCreator<T, Mps, Mcs, U>,
   options: ZusoundOptions<T> = {}
-): StateCreator<T, Mps, [...Mcs]> => {
+): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> {
   const {
     enabled = !isProduction(),
     logDiffs = false,
     allowInProduction = false,
-    onTrace: userOnTrace, // User-defined callback *after* event dispatch
-    diffFn, // Custom diff function
-    initSonification = true, // Default to true for backward compatibility
-    ...restOptions // Remaining options passed down to core trace
+    onTrace: userOnTrace,
+    diffFn,
+    initSonification = true,
+    ...restOptions
   } = options
 
   const inProduction = isProduction()
   const isDisabled = !enabled || (inProduction && !allowInProduction)
 
-  // If middleware is disabled, return the original initializer
+  // If disabled, return the original initializer.
+  // Type casting is needed because the function signature promises to add the mutator,
+  // but in this branch, it doesn't. This is a necessary compromise for the disabled case.
   if (isDisabled) {
-    return initializer as StateCreator<T, Mps, [...Mcs]>
+    return initializer as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>
+    // Note: A technically more correct but complex return type would be conditional.
+    // However, this cast allows the overall function signature to remain consistent.
   }
 
-  // Initialize sonification listener if requested (runs once)
   if (typeof window !== 'undefined' && initSonification) {
-    // Use setTimeout to ensure DOM is ready and avoid blocking initial render
+    // Initialize lazily after mount to ensure window context
     setTimeout(() => {
       try {
-        initSonificationListener() // Initialize sonification listener
+        initSonificationListener()
       } catch (error) {
         console.error('Error initializing sonification:', error)
       }
     }, 0)
   }
 
-  // --- Custom trace processor (internal onTrace for core) ---
+  // onTrace callback that dispatches events and calls user callback
   const coreOnTrace = (traceData: TraceData<T>) => {
-    // 1. Dispatch the trace event for sonification and visualization
     dispatchTraceEvent(traceData)
-
-    // 2. Call user's onTrace callback if provided
     if (userOnTrace) {
       try {
         userOnTrace(traceData)
@@ -78,33 +77,41 @@ export const zusound: Zusound = <
     }
   }
 
-  // --- Prepare TraceOptions for the core trace middleware ---
+  // Prepare options for the core trace function
   const traceOptions: TraceOptions<T> = {
-    ...restOptions, // Pass down any remaining compatible options
-    diffFn, // Pass down custom diff function if provided
-    onTrace: coreOnTrace, // Use the internal handler that dispatches events & calls user callback
+    ...restOptions,
+    diffFn,
+    onTrace: coreOnTrace,
   }
 
-  // --- Setup Logging ---
-  // Wrap the coreOnTrace if logging is enabled
+  // Add logging functionality if enabled
   if (logDiffs) {
     if (typeof window !== 'undefined' && !window['__zusound_logger__']) {
-      window['__zusound_logger__'] = [] // Initialize logger array if needed
+      window['__zusound_logger__'] = []
     }
-    // Keep the original coreOnTrace to call it after logging
-    const originalCoreOnTrace = traceOptions.onTrace as (traceData: TraceData<T>) => void
+    const originalCoreOnTrace = traceOptions.onTrace // Keep reference before overwriting
     traceOptions.onTrace = (traceData: TraceData<T>) => {
       if (typeof window !== 'undefined' && window['__zusound_logger__']) {
-        // Push a copy to avoid mutation issues if traceData is modified later
-        window['__zusound_logger__'].push({ ...traceData })
+        window['__zusound_logger__'].push({ ...traceData }) // Log a copy
       }
-      // Call the original handler (which dispatches events + user callback)
-      originalCoreOnTrace(traceData)
+      originalCoreOnTrace?.(traceData) // Call the original handler (event dispatch + user callback)
     }
   }
 
-  // Apply the core trace middleware with the prepared options
-  // Note: Type assertion is needed because the generic constraints differ slightly
-  // between the public Zusound type and the internal Trace type.
-  return trace(initializer, traceOptions) as StateCreator<T, Mps, [...Mcs]>
+  // Apply the core trace middleware
+  // `trace` has the public signature: StateCreator<T, Mps, Mcs> -> StateCreator<T, Mps, [...Mcs, Mutator]>
+  // Internally, it uses `traceImpl` which expects StateCreator<T, [], []>
+  // The assertion `trace = traceImpl as Trace` handles mapping the implementation.
+  // We need to cast the input `initializer` to satisfy the internal traceImpl expectation.
+  const tracedInitializer = trace(
+    initializer as unknown as StateCreator<T, [], []>, // Double-cast through unknown
+    traceOptions
+  )
+
+  // The type of `tracedInitializer` *should* be inferred correctly by `trace`'s public signature
+  // as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple]> if the input Mps/Mcs were passed through.
+  // However, due to the internal `traceImpl` signature and casting, its actual return type
+  // aligns with `StateCreator<T, [], [ZusoundMutatorTuple]>`.
+  // Therefore, we explicitly cast the result to match the declared public `Zusound` return type.
+  return tracedInitializer as unknown as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> // Cast Output
 }
