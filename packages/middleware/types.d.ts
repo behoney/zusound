@@ -1,13 +1,16 @@
-import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
-// Import TraceOptions and TraceData from core, DiffResult from diff
-import type { TraceOptions, TraceData } from '../core'
-import type { DiffResult } from '../diff'
+import type { StoreMutatorIdentifier as ZustandStoreMutatorIdentifier, StateCreator } from 'zustand'
+// Import ZusoundMutatorTuple, TraceOptions and TraceData from core
+import type { ZusoundMutatorTuple, TraceOptions, TraceData } from '../core'
+import type { DiffResult } from '../diff' // Import DiffResult
 
 /**
  * Interface for zusound middleware options.
  * Extends the core TraceOptions with middleware-specific settings.
+ * Omit onTrace and diffFn here so the middleware can provide its own defaults/wrapping
+ * before passing down to core, but allow overriding via ZusoundOptions.
  */
-export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
+export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace' | 'diffFn'> {
+  // Omit here
   /** Enable/disable sound feedback (default: true in dev, false in prod) */
   enabled?: boolean
   /** Log state diffs to window.__zusound_logger__ (default: false) */
@@ -18,13 +21,13 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
    * Optional custom diffing function. Overrides the one in TraceOptions if provided.
    * Defaults to the `calculateDiff` function from the diff package.
    */
-  diffFn?: (prevState: T, nextState: T) => DiffResult<T>
+  diffFn?: (prevState: T, nextState: T) => DiffResult<T> // Add back here
   /**
    * Optional callback executed after sonification for each state change.
-   * Receives trace data (state, diff, duration, etc.). This is separate from
-   * the internal onTrace used by the core trace middleware.
+   * Receives trace data (state, diff, duration, etc.). This is the primary
+   * way to interact with the trace data from the middleware layer.
    */
-  onTrace?: (traceData: TraceData<T>) => void
+  onTrace?: (traceData: TraceData<T>) => void // Add back here
   /**
    * Automatically initialize the sonification listener when middleware is used (default: true).
    * Set to false if you want to manually control when sonification starts using initSonificationListener.
@@ -33,16 +36,24 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace'> {
 }
 
 /**
- * Type definition for the zusound middleware function.
- * This type captures the middleware's generic parameters and return type.
+ * Middleware entry function for zusound.
+ * It wraps the core `trace` middleware with middleware-specific options and logic.
+ * It follows the standard Zustand middleware pattern.
  */
-export type Zusound = <
-  T extends object,
-  Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
->(
-  initializer: StateCreator<T, [...Mps] | [...Mps], Mcs>, // Adjusted Mps signature for compatibility
-  options?: ZusoundOptions<T>
-) => StateCreator<T, Mps, [...Mcs]>
+export interface Zusound {
+  <
+    T extends object, // Base state type
+    Mps extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Past Set
+    Mcs extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Current Set
+    U = T, // Initial state slice type
+  >(
+    // The initializer receives Mps and Mcs from the previous middleware
+    initializer: StateCreator<T, Mps, Mcs, U>,
+    options?: ZusoundOptions<T>
+  ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> // Returns StateCreator with ZusoundMutatorTuple added to Mcs
+}
 
-// Note: We don't need to re-import ZusoundOptions from './types' as it's defined here.
+// Note: The `StoreMutators` augmentation is handled in packages/core/types.d.ts
+
+// Export ZusoundMutatorTuple for advanced users if needed
+// export { ZusoundMutatorTuple } from '../core' // Can re-export if desired
