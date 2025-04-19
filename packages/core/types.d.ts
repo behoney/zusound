@@ -1,25 +1,30 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 import type { DiffResult } from '../diff' // Import DiffResult from diff package
 
+
 /** Utility type to modify properties of an existing type. */
-type Write<T, U> = Omit<T, keyof U> & U
+// type Write<T, U> = Omit<T, keyof U> & U // Not currently used in core middleware
 
 /**
- * Represents the type of a store enhanced with the trace middleware.
- * In this basic version, it doesn't alter the public signature significantly,
- * but defining it maintains the pattern for potential future extensions.
+ * Defines the unique mutator identifier tuple for zusound.
+ * Changed `never` to `unknown` to align with Zustand's internal generic constraints
+ * on `Mps` and `Mcs` which use `[StoreMutatorIdentifier, unknown][]`.
  */
-type WithZusound<S> = S // Keep this simple for now
+export type ZusoundMutatorTuple = ['zustand/zusound', unknown];
+
 
 /**
  * Augments the Zustand vanilla module definition.
  * This allows TypeScript to recognize the custom mutator type added by this middleware.
+ * Make sure the key 'zustand/zusound' matches the string literal in ZusoundMutatorTuple.
  */
 declare module 'zustand/vanilla' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface StoreMutators<S, A> {
-    // This defines the state mutation caused by the middleware
-    zusound: WithZusound<S>
+    // This registers 'zustand/zusound' as a valid key in the StoreMutators union.
+    // The type here indicates what applying this mutator results in for the store type S.
+    // It doesn't add public actions via set(..., action), so S is appropriate here.
+    'zustand/zusound': S
   }
 }
 
@@ -33,6 +38,8 @@ export interface TraceData<T = unknown> {
   timestampStart: number
   /** Duration of the update in milliseconds. */
   duration: number
+  /** Optional action identifier (from zustand devtools middleware for example) */
+  action?: string | object
 }
 
 /** Detail payload for the trace event */
@@ -49,37 +56,33 @@ export interface TraceOptions<T> {
   onTrace?: (traceData: TraceData<T>) => void
   /**
    * Optional custom diffing function.
-   * Defaults to the `calculateDiff` function from the diff package.
+   * Defaults to the calculateDiff function from the diff package.
    */
   diffFn?: (prevState: T, nextState: T) => DiffResult<T> // Use imported DiffResult type
 }
 
-/** Public type signature for the trace middleware function. */
+/**
+ * Public type signature for the trace middleware function.
+ * It follows the standard Zustand middleware pattern.
+ */
 export type Trace = <
-  T,
-  Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+  T, // Base state type
+  Mps extends [StoreMutatorIdentifier, unknown][] = [], // Middleware Past Set
+  Mcs extends [StoreMutatorIdentifier, unknown][] = [], // Middleware Current Set
+  U = T // Initial state slice type (often T, but can differ)
 >(
-  // The initializer receives ZusoundMutator in its Mps list
-  initializer: StateCreator<T, [...Mps], Mcs>,
-  options?: TraceOptions<T>
-  // The returned creator has ZusoundMutator added to its Mcs list
-) => StateCreator<T, Mps, [...Mcs]>
-
-/** Internal type signature for the trace middleware's implementation. */
-export type TraceImpl = <T>(
-  initializer: StateCreator<T, [], []>, // Implementation works on the base creator
-  options?: TraceOptions<T>
-) => StateCreator<T, [], []>
-
-export function zusound<
-  T extends object,
-  Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
-  U = T
->(
+  // The initializer receives Mps and Mcs from the previous middleware
   initializer: StateCreator<T, Mps, Mcs, U>,
-  options: ZusoundOptions<T> = {}
-): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> {
-  // …your existing implementation…
-}
+  options?: TraceOptions<T>
+  // The returned creator has the same Mps, but adds ZusoundMutatorTuple to Mcs
+) => StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>
+
+
+/**
+ * Internal type signature for the trace middleware's implementation.
+ * This should be the same as the public `Trace` type.
+ */
+export type TraceImpl = Trace;
+
+// Remove the redundant zusound function export from here
+// export function zusound< ... > { ... } // REMOVE
