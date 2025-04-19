@@ -1,7 +1,6 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 import type { DiffResult } from '../diff' // Import DiffResult from diff package
 
-
 /** Utility type to modify properties of an existing type. */
 // type Write<T, U> = Omit<T, keyof U> & U // Not currently used in core middleware
 
@@ -10,8 +9,7 @@ import type { DiffResult } from '../diff' // Import DiffResult from diff package
  * Changed `never` to `unknown` to align with Zustand's internal generic constraints
  * on `Mps` and `Mcs` which use `[StoreMutatorIdentifier, unknown][]`.
  */
-export type ZusoundMutatorTuple = ['zustand/zusound', unknown];
-
+export type ZusoundMutatorTuple = ['zustand/zusound', unknown]
 
 /**
  * Augments the Zustand vanilla module definition.
@@ -69,7 +67,7 @@ export type Trace = <
   T, // Base state type
   Mps extends [StoreMutatorIdentifier, unknown][] = [], // Middleware Past Set
   Mcs extends [StoreMutatorIdentifier, unknown][] = [], // Middleware Current Set
-  U = T // Initial state slice type (often T, but can differ)
+  U = T, // Initial state slice type (often T, but can differ)
 >(
   // The initializer receives Mps and Mcs from the previous middleware
   initializer: StateCreator<T, Mps, Mcs, U>,
@@ -77,12 +75,11 @@ export type Trace = <
   // The returned creator has the same Mps, but adds ZusoundMutatorTuple to Mcs
 ) => StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>
 
-
 /**
  * Internal type signature for the trace middleware's implementation.
  * This should be the same as the public `Trace` type.
  */
-export type TraceImpl = Trace;
+export type TraceImpl = Trace
 
 // Remove the redundant zusound function export from here
 // export function zusound< ... > { ... } // REMOVE

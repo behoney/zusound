@@ -1,6 +1,11 @@
-import type { StoreMutatorIdentifier, StateCreator, StoreApi } from 'zustand'
+import type { StoreMutatorIdentifier, StateCreator } from 'zustand'
 // Import types directly from core
-import type { TraceOptions, TraceData, ZusoundTraceEventDetail, ZusoundMutatorTuple } from '../core/types' // ZusoundMutatorTuple is now ['zustand/zusound', unknown]
+import type {
+  TraceOptions,
+  TraceData,
+  ZusoundTraceEventDetail,
+  ZusoundMutatorTuple,
+} from '../core/types' // ZusoundMutatorTuple is now ['zustand/zusound', unknown]
 import { trace } from '../core' // Core trace middleware function (now correctly typed)
 import type { ZusoundOptions } from './types' // Middleware-specific types
 import { isProduction } from './utils'
@@ -30,12 +35,13 @@ export function zusound<
   T extends object,
   Mps extends [StoreMutatorIdentifier, unknown][] = [],
   Mcs extends [StoreMutatorIdentifier, unknown][] = [],
-  U = T
+  U = T,
 >(
   // Initializer from the layer below (either base creator or another middleware)
   initializer: StateCreator<T, Mps, Mcs, U>,
   options: ZusoundOptions<T> = {}
-): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> { // Return type adds ZusoundMutatorTuple (now ['zustand/zusound', unknown])
+): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> {
+  // Return type adds ZusoundMutatorTuple (now ['zustand/zusound', unknown])
   const {
     enabled = !isProduction(),
     logDiffs = false,
@@ -56,7 +62,7 @@ export function zusound<
   if (isDisabled) {
     // Casting to 'any' then to the target type is a common way to bypass
     // strictness when you know the runtime behavior is correct but types don't align.
-    return initializer as any as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>;
+    return initializer as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>
   }
 
   // Initialize sonification listener if enabled and in browser
@@ -65,11 +71,11 @@ export function zusound<
     // Use requestAnimationFrame for potentially better timing after initial render
     requestAnimationFrame(() => {
       try {
-        initSonificationListener();
+        initSonificationListener()
       } catch (error) {
-        console.error('[Zusound Middleware] Error initializing sonification listener:', error);
+        console.error('[Zusound Middleware] Error initializing sonification listener:', error)
       }
-    });
+    })
   }
 
   // Internal onTrace callback used by the core trace middleware.
@@ -97,16 +103,16 @@ export function zusound<
   // Add logging functionality if enabled
   if (logDiffs) {
     if (typeof window !== 'undefined' && !window['__zusound_logger__']) {
-      window['__zusound_logger__'] = [] as TraceData<T>[]; // Ensure logger array exists and type it
+      window['__zusound_logger__'] = [] as TraceData<T>[] // Ensure logger array exists and type it
     }
-    const originalCoreOnTrace = traceOptions.onTrace; // Keep reference to event dispatch + user callback
+    const originalCoreOnTrace = traceOptions.onTrace // Keep reference to event dispatch + user callback
     traceOptions.onTrace = (traceData: TraceData<T>) => {
       if (typeof window !== 'undefined' && window['__zusound_logger__']) {
         // Push a plain object copy to avoid potential issues with complex objects/proxies
-        window['__zusound_logger__'].push(JSON.parse(JSON.stringify(traceData)));
+        window['__zusound_logger__'].push(JSON.parse(JSON.stringify(traceData)))
       }
-      originalCoreOnTrace?.(traceData); // Call the original handler
-    };
+      originalCoreOnTrace?.(traceData) // Call the original handler
+    }
   }
 
   // Apply the core trace middleware.
@@ -117,5 +123,5 @@ export function zusound<
   // The type of `tracedInitializer` is now correctly inferred by `trace`'s
   // signature as StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>.
   // We just return it.
-  return tracedInitializer;
+  return tracedInitializer
 }

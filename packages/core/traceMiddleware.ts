@@ -82,7 +82,14 @@ const createTracedSetState = <T>(
     // console.log('[Zusound Core] State changed, tracing...', { prevState, nextState, action }); // Optional: for debugging
 
     // Calculate the trace data using the helper function.
-    const traceData = calculateTraceData(prevState, nextState, timestampStart, timestampEnd, diffFn, action)
+    const traceData = calculateTraceData(
+      prevState,
+      nextState,
+      timestampStart,
+      timestampEnd,
+      diffFn,
+      action
+    )
 
     // Process the trace data using the helper function.
     processTrace(traceData, onTrace)
@@ -100,34 +107,43 @@ const createTracedSetState = <T>(
  * StateCreator<T, Mps, Mcs> => StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple]>
  */
 export const traceImpl: TraceImpl =
-  <T, Mps extends [StoreMutatorIdentifier, unknown][], Mcs extends [StoreMutatorIdentifier, unknown][], U>(
+  <
+    T,
+    Mps extends [StoreMutatorIdentifier, unknown][],
+    Mcs extends [StoreMutatorIdentifier, unknown][],
+    U,
+  >(
     // The initializer from the next middleware or the base store creator
     initializer: StateCreator<T, Mps, Mcs, U>,
     options: TraceOptions<T> = {}
   ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> => // This is the StateCreator returned by traceImpl
-    (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => { // These are provided by the outer middleware/Zustand
-      const {
-  // Default onTrace does nothing if not provided.
-        onTrace = () => { },
-        // Use the default diff function if none is provided.
-        diffFn = calculateDiff as (prevState: T, nextState: T) => DiffResult<T>,
-      } = options
+  (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => {
+    // These are provided by the outer middleware/Zustand
+    const {
+      // Default onTrace does nothing if not provided.
+      onTrace = () => {},
+      // Use the default diff function if none is provided.
+      diffFn = calculateDiff as (prevState: T, nextState: T) => DiffResult<T>,
+    } = options
 
-      // Create the traced version of setState, wrapping the 'set' function
-      // that was provided by the outer middleware or Zustand itself.
-      const tracedSetState = createTracedSetState(set, api, diffFn, onTrace)
+    // Create the traced version of setState, wrapping the 'set' function
+    // that was provided by the outer middleware or Zustand itself.
+    const tracedSetState = createTracedSetState(set, api, diffFn, onTrace)
 
-      // Call the original initializer with the traced set function.
-      // The initializer will then use this traced function for its state updates.
-      // The initializer returns the initial state slice.
-      const initialState = initializer(
-        tracedSetState as any, // Use 'any' to bypass complex type checks
-        get as any, // Use 'any' to bypass complex type checks  
-        api as any // Use 'any' to bypass complex type checks
-      )
+    // Call the original initializer with the traced set function.
+    // The initializer will then use this traced function for its state updates.
+    // The initializer returns the initial state slice.
+    const initialState = initializer(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tracedSetState as any, // Use 'any' to bypass complex type checks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      get as any, // Use 'any' to bypass complex type checks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      api as any // Use 'any' to bypass complex type checks
+    )
 
-      // The StateCreator returned by traceImpl simply returns the initial state slice
-      // received from the initializer. Its type signature correctly declares
-      // that the 'zustand/zusound' mutator has been added to the Mcs list.
-      return initialState
-    }
+    // The StateCreator returned by traceImpl simply returns the initial state slice
+    // received from the initializer. Its type signature correctly declares
+    // that the 'zustand/zusound' mutator has been added to the Mcs list.
+    return initialState
+  }

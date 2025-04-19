@@ -3,14 +3,14 @@ import type { StoreMutatorIdentifier as ZustandStoreMutatorIdentifier, StateCrea
 import type { ZusoundMutatorTuple, TraceOptions, TraceData } from '../core'
 import type { DiffResult } from '../diff' // Import DiffResult
 
-
 /**
  * Interface for zusound middleware options.
  * Extends the core TraceOptions with middleware-specific settings.
  * Omit onTrace and diffFn here so the middleware can provide its own defaults/wrapping
  * before passing down to core, but allow overriding via ZusoundOptions.
  */
-export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace' | 'diffFn'> { // Omit here
+export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace' | 'diffFn'> {
+  // Omit here
   /** Enable/disable sound feedback (default: true in dev, false in prod) */
   enabled?: boolean
   /** Log state diffs to window.__zusound_logger__ (default: false) */
@@ -41,15 +41,16 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace' | 'di
  * It follows the standard Zustand middleware pattern.
  */
 export interface Zusound {
-  <T extends object, // Base state type
+  <
+    T extends object, // Base state type
     Mps extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Past Set
     Mcs extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Current Set
-    U = T // Initial state slice type
+    U = T, // Initial state slice type
   >(
     // The initializer receives Mps and Mcs from the previous middleware
     initializer: StateCreator<T, Mps, Mcs, U>,
     options?: ZusoundOptions<T>
-  ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U>; // Returns StateCreator with ZusoundMutatorTuple added to Mcs
+  ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> // Returns StateCreator with ZusoundMutatorTuple added to Mcs
 }
 
 // Note: The `StoreMutators` augmentation is handled in packages/core/types.d.ts
