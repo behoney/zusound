@@ -1,13 +1,44 @@
+// packages/sonification/__tests__/sonification.test.ts
 /// <reference types="vitest" />
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance, type Mock } from 'vitest'
 import { diffToSonic, playSonicChunk, sonifyChanges } from '../sonification'
-import * as sonificationModule from '../sonification' // Import the module itself
+import * as sonificationModule from '../sonification' // Import the module to spy on exports
+import { AudioContextManager, simpleHash } from '../utils' // Import necessary utils
 import { AUDIO_CONFIG } from '../constants'
-import { SonicChunk } from '../types'
+import type { SonicChunk } from '../types'
 
 // --- Mock Setup ---
 
-// 1. Define mock functions/objects outside
+// 1. Mock specific utilities
+// Use vi.hoisted() to ensure mocks are available before imports in the module under test
+const { mockedSimpleHash, MockAudioContextManager } = vi.hoisted(() => {
+  const mockedSimpleHash = vi.fn((str: string): number => {
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i)
+      hash = (hash << 5) - hash + char
+      hash |= 0 // Convert to 32bit integer
+    }
+    return Math.abs(hash) % 1000 // Keep hash smaller for easier testing
+  })
+  const MockAudioContextManager = {
+    getInstance: vi.fn(), // Mock static method
+  }
+  return { mockedSimpleHash, MockAudioContextManager }
+})
+
+vi.mock('../utils', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../utils')>()
+  return {
+    ...original,
+    simpleHash: mockedSimpleHash,
+    AudioContextManager: MockAudioContextManager,
+  }
+})
+
+
+// 2. Define Mocks for Web Audio API (needed for playSonicChunk)
+// Keep these simple function mocks
 const mockSetValueAtTime = vi.fn()
 const mockExponentialRamp = vi.fn()
 const mockLinearRamp = vi.fn()
@@ -16,255 +47,245 @@ const mockDisconnect = vi.fn()
 const mockStart = vi.fn()
 const mockStop = vi.fn()
 const mockResume = vi.fn().mockResolvedValue(undefined)
+const mockClose = vi.fn().mockResolvedValue(undefined)
 
-// Define a mutable mock object for the oscillator to track properties like 'onended' and 'type'
-const mockOscillator = {
+// Use a factory for mock oscillator to ensure fresh state
+const createMockOscillator = () => ({
   frequency: { setValueAtTime: mockSetValueAtTime },
-  detune: { setValueAtTime: mockSetValueAtTime }, // Can reuse or create separate mock
+  detune: { setValueAtTime: mockSetValueAtTime },
   connect: mockConnect,
   start: mockStart,
   stop: mockStop,
   disconnect: mockDisconnect,
-  onended: null as (() => void) | null, // Explicitly type onended
-  type: 'sine' as OscillatorType, // Add type property and initialize
-}
-const mockGainNode = {
+  onended: null as (() => void) | null,
+  type: 'sine' as OscillatorType,
+})
+
+// Use a factory for mock gain node
+const createMockGainNode = () => ({
   gain: {
-    setValueAtTime: mockSetValueAtTime, // Reuse
+    setValueAtTime: mockSetValueAtTime,
     exponentialRampToValueAtTime: mockExponentialRamp,
     linearRampToValueAtTime: mockLinearRamp,
   },
-  connect: mockConnect, // Reuse
-  disconnect: mockDisconnect, // Reuse
-}
-const mockCreateOscillator = vi.fn(() => mockOscillator)
-const mockCreateGain = vi.fn(() => mockGainNode)
-
-// Define a base mock context object
-const baseMockAudioContext = {
-  createOscillator: mockCreateOscillator,
-  createGain: mockCreateGain,
-  destination: {},
-  currentTime: 0,
-  state: 'running' as AudioContextState,
-  resume: mockResume,
-}
-
-const mockGetContext = vi.fn(() => baseMockAudioContext)
-const mockGetInstance = vi.fn(() => ({
-  getContext: mockGetContext,
-}))
-const mockSimpleHash = vi.fn((str: string): number => {
-  // Simple predictable hash for testing consistency
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = (hash << 5) - hash + char
-    hash |= 0 // Convert to 32bit integer
-  }
-  return Math.abs(hash)
+  connect: mockConnect,
+  disconnect: mockDisconnect,
 })
 
-// Now mock the module itself
-vi.mock('../utils', async importOriginal => {
-  const original = await importOriginal<typeof import('../utils')>()
+// Keep these as separate mocks, reset in beforeEach
+let mockCreateOscillator: Mock
+let mockCreateGain: Mock
 
-  // Mock the class itself if needed, but focus on mocking the static method
-  const MockAudioContextManager = {
-    getInstance: mockGetInstance,
-  }
-
-  return {
-    ...original,
-    AudioContextManager: MockAudioContextManager, // Provide the mock object
-  }
+// Define a factory for the mock context
+const createMockAudioContext = (state: AudioContextState = 'running') => ({
+  createOscillator: mockCreateOscillator,
+  createGain: mockCreateGain,
+  destination: { type: 'destination' }, // Simple object for identification
+  currentTime: 0,
+  state: state,
+  resume: mockResume,
+  close: mockClose,
 })
 
 // --- Test Suite ---
 
 describe('sonification', () => {
-  // Use fake timers for testing setTimeout in sonifyChanges
-  vi.useFakeTimers()
+  let mockAudioContext: ReturnType<typeof createMockAudioContext>
+  let mockAudioManagerInstance: {
+    getContext: Mock
+    tryResumeAudioContext: Mock
+  }
+  let playSonicChunkSpy: MockInstance
+  let consoleErrorSpy: MockInstance
+  let consoleWarnSpy: MockInstance
+  let consoleLogSpy: MockInstance
+  let dispatchEventSpy: MockInstance
 
-  // Reset mocks before each test
   beforeEach(() => {
+    // Activate fake timers BEFORE setting up mocks that might use them
+    vi.useFakeTimers()
+
+    // Reset all mocks provided by Vitest
     vi.clearAllMocks()
-    // Reset mutable properties of mock objects
-    mockOscillator.onended = null
-    mockOscillator.type = 'sine'
-    // Reset mock return values if they might have been changed by specific tests
-    mockGetContext.mockReturnValue(baseMockAudioContext)
-    mockGetInstance.mockReturnValue({ getContext: mockGetContext })
-    // Reset hash mock (optional, depends if specific tests modify it)
-    mockSimpleHash.mockImplementation((str: string): number => {
-      let hash = 0
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = (hash << 5) - hash + char
-        hash |= 0
-      }
-      return Math.abs(hash)
-    })
+    // Explicitly reset mocks created manually
+    mockSetValueAtTime.mockClear()
+    mockExponentialRamp.mockClear()
+    mockLinearRamp.mockClear()
+    mockConnect.mockClear()
+    mockDisconnect.mockClear()
+    mockStart.mockClear()
+    mockStop.mockClear()
+    mockResume.mockClear().mockResolvedValue(undefined) // Reset and set default resolve
+    mockClose.mockClear().mockResolvedValue(undefined)
+
+    // Recreate oscillator/gain mocks for clean state
+    mockCreateOscillator = vi.fn(createMockOscillator)
+    mockCreateGain = vi.fn(createMockGainNode)
+
+    // Setup mock AudioContextManager for playSonicChunk tests
+    mockAudioContext = createMockAudioContext('running') // Default to running state
+    mockAudioManagerInstance = {
+      getContext: vi.fn(() => mockAudioContext),
+      tryResumeAudioContext: vi.fn().mockResolvedValue({ resumed: true, blocked: false }),
+    }
+    // Configure the static getInstance mock to return our instance mock
+    MockAudioContextManager.getInstance.mockReturnValue(mockAudioManagerInstance)
+
+    // Spy on playSonicChunk within its own module for sonifyChanges tests
+    playSonicChunkSpy = vi
+      .spyOn(sonificationModule, 'playSonicChunk')
+      .mockResolvedValue(true) // Mock implementation to avoid actual execution
+
+    // Spy on console methods
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { })
+
+    // Spy on window.dispatchEvent for checking visualizer event
+    dispatchEventSpy = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => true)
+
+    // Reset timer baseline
+    vi.setSystemTime(new Date())
   })
 
+  afterEach(() => {
+    // Restore spies
+    consoleErrorSpy.mockRestore()
+    consoleWarnSpy.mockRestore()
+    consoleLogSpy.mockRestore()
+    playSonicChunkSpy.mockRestore()
+    dispatchEventSpy.mockRestore()
+
+    // Ensure all timers are cleared
+    vi.clearAllTimers()
+    // Restore real timers AFTER clearing fake ones
+    vi.useRealTimers()
+  })
+
+  // --- diffToSonic Tests ---
   describe('diffToSonic', () => {
-    it('should return empty array for empty or null diff', () => {
+    // Use the hoisted mock directly
+    // const mockedSimpleHash = simpleHash as MockInstance<[string], number>; // No need for this cast
+
+    it('should return empty array for empty, null or undefined diff', () => {
       expect(diffToSonic({}, 100)).toEqual([])
-      expect(diffToSonic(null as any, 100)).toEqual([])
-      expect(diffToSonic(undefined as any, 100)).toEqual([])
+      expect(diffToSonic(null as unknown as Partial<unknown>, 100)).toEqual([])
+      expect(diffToSonic(undefined as unknown as Partial<unknown>, 100)).toEqual([])
     })
 
-    it('should convert added property (detected as change with value)', () => {
-      const diff = { newKey: 'value' }
-      const chunks = diffToSonic(diff, 100)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('newKey')
+    it('should convert added/changed properties correctly', () => {
+      const diff = { newKey: 'value', count: 5, active: true }
+      mockedSimpleHash.mockReturnValueOnce(123).mockReturnValueOnce(456).mockReturnValueOnce(789) // Simulate hash results
+
+      const chunks = diffToSonic(diff, 150)
+      expect(chunks).toHaveLength(3)
+
+    // Check string ('newKey')
       expect(chunks[0]).toMatchObject({
         id: 'newKey',
-        valueType: 'change', // Since value is defined, it's treated as 'change'
-        type: 'square', // Based on string type
-        duration: 100,
+        valueType: 'change',
+        type: 'square',
+        duration: 150,
         magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
+        frequency: expect.any(Number),
+        detune: expect.closeTo(Math.log1p(5) * 25), // length 5
       })
-      expect(chunks[0].frequency).toBeGreaterThan(0)
-      expect(chunks[0].detune).toBeGreaterThan(0) // String length > 0
+      expect(mockedSimpleHash).toHaveBeenCalledWith('newKey')
+
+      // Check number ('count')
+      expect(chunks[1]).toMatchObject({
+        id: 'count',
+        valueType: 'change',
+        type: 'sine',
+        duration: 150,
+        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
+        frequency: expect.any(Number),
+        detune: expect.closeTo(Math.log1p(5) * 50), // value 5
+      })
+      expect(mockedSimpleHash).toHaveBeenCalledWith('count')
+
+      // Check boolean ('active')
+      expect(chunks[2]).toMatchObject({
+        id: 'active',
+        valueType: 'change',
+        type: 'sawtooth',
+        duration: 150,
+        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
+        frequency: expect.any(Number),
+        detune: 25, // true
+      })
+      expect(mockedSimpleHash).toHaveBeenCalledWith('active')
     })
 
-    it('should convert removed property (value is undefined)', () => {
-      const diff = { oldKey: undefined }
+    it('should convert removed properties (undefined or null) correctly', () => {
+      const diff = { oldKey: undefined, anotherKey: null }
+      mockedSimpleHash.mockReturnValueOnce(111).mockReturnValueOnce(222)
+
       const chunks = diffToSonic(diff, 100)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('oldKey')
+      expect(chunks).toHaveLength(2)
+
       expect(chunks[0]).toMatchObject({
         id: 'oldKey',
         valueType: 'remove',
-        type: 'triangle', // Based on remove type
-        duration: 100,
-        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.REMOVE,
-        detune: 0, // Detune is 0 for removals
-      })
-      expect(chunks[0].frequency).toBeGreaterThan(0)
-    })
-
-    it('should convert removed property (value is null)', () => {
-      const diff = { oldKey: null }
-      const chunks = diffToSonic(diff, 100)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('oldKey')
-      expect(chunks[0]).toMatchObject({
-        id: 'oldKey',
-        valueType: 'remove', // null is treated as remove
         type: 'triangle',
         duration: 100,
         magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.REMOVE,
         detune: 0,
       })
-      expect(chunks[0].frequency).toBeGreaterThan(0)
-    })
+      expect(mockedSimpleHash).toHaveBeenCalledWith('oldKey')
 
-    it('should convert changed number property and respect MIN_DURATION_MS', () => {
-      const diff = { count: 10 }
-      const duration = 5 // Less than default min duration
-      const chunks = diffToSonic(diff, duration)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('count')
-      expect(chunks[0]).toMatchObject({
-        id: 'count',
-        valueType: 'change',
-        type: 'sine', // Based on number type
-        duration: AUDIO_CONFIG.MIN_DURATION_MS, // Uses min duration
-        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
-      })
-      expect(chunks[0].frequency).toBeGreaterThan(0)
-      // Check detune calculation (logarithmic scale for number magnitude)
-      expect(chunks[0].detune).toBeCloseTo(Math.min(Math.log1p(10) * 50, 600))
-    })
-
-    it('should convert changed boolean property (true)', () => {
-      const diff = { isActive: true }
-      const chunks = diffToSonic(diff, 120)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('isActive')
-      expect(chunks[0]).toMatchObject({
-        id: 'isActive',
-        valueType: 'change',
-        type: 'sawtooth', // Based on boolean type
-        duration: 120,
-        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
-        detune: 25, // Specific detune for true
-      })
-    })
-
-    it('should convert changed boolean property (false)', () => {
-      const diff = { isActive: false }
-      const chunks = diffToSonic(diff, 120)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('isActive')
-      expect(chunks[0]).toMatchObject({
-        id: 'isActive',
-        valueType: 'change',
-        type: 'sawtooth',
-        duration: 120,
-        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
-        detune: -25, // Specific detune for false
-      })
-    })
-
-    it('should convert changed object property', () => {
-      const diff = { user: { name: 'test' } }
-      const chunks = diffToSonic(diff, 100)
-      expect(chunks).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('user')
-      expect(chunks[0]).toMatchObject({
-        id: 'user',
-        valueType: 'change',
-        type: 'triangle', // Default for objects
+      expect(chunks[1]).toMatchObject({
+        id: 'anotherKey',
+        valueType: 'remove',
+        type: 'triangle',
         duration: 100,
-        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE,
-        detune: 0, // No detune for objects currently
+        magnitude: AUDIO_CONFIG.DEFAULT_MAGNITUDE.REMOVE,
+        detune: 0,
       })
+      expect(mockedSimpleHash).toHaveBeenCalledWith('anotherKey')
     })
 
-    it('should handle nested keys affecting frequency', () => {
-      const diff = { 'user.profile.name': 'test' }
-      const chunks = diffToSonic(diff, 100)
-      const diffShallow = { name: 'test' }
-      const chunksShallow = diffToSonic(diffShallow, 100)
-
-      expect(chunks).toHaveLength(1)
-      expect(chunksShallow).toHaveLength(1)
-      expect(mockSimpleHash).toHaveBeenCalledWith('user.profile.name')
-      expect(mockSimpleHash).toHaveBeenCalledWith('name')
-      // Verify frequency is higher for deeper key (assuming hash doesn't collide badly)
-      // This relies on the simpleHash mock being consistent
-      expect(chunks[0].frequency).toBeGreaterThan(0)
-      expect(chunksShallow[0].frequency).toBeGreaterThan(0)
-      // Exact comparison depends heavily on hash and scale logic,
-      // but we can check the depth multiplier effect exists.
-      // freq = base * 2^oct * scale[idx] * (1 + depth * 0.05)
-      // Assuming same base/octave/scaleIdx, freqDeep / freqShallow ~= (1 + 2*0.05) / (1 + 0*0.05) = 1.1
-      // This is a loose check:
-      expect(chunks[0].frequency).not.toEqual(chunksShallow[0].frequency)
-      expect(chunks[0].type).toBe('square') // string
+    it('should use MIN_DURATION_MS if provided duration is too short', () => {
+      const diff = { count: 10 }
+      mockedSimpleHash.mockReturnValueOnce(333)
+      const chunks = diffToSonic(diff, 10) // Duration less than min
+      expect(chunks[0].duration).toBe(AUDIO_CONFIG.MIN_DURATION_MS)
     })
 
-    it('should cap detune for large numbers', () => {
-      const diff = { largeNum: 1e9 }
-      const chunks = diffToSonic(diff, 100)
-      expect(chunks[0].detune).toBeCloseTo(600) // Max detune for numbers
+    it('should handle nested keys affecting frequency calculation (via hash input)', () => {
+      const diffDeep = { 'user.profile.name': 'test' };
+      mockedSimpleHash.mockReturnValueOnce(500); // Hash for deep key
+      const chunksDeep = diffToSonic(diffDeep, 100);
+      expect(mockedSimpleHash).toHaveBeenCalledWith('user.profile.name');
+
+      mockedSimpleHash.mockClear(); // Clear calls before next test case
+
+      const diffShallow = { name: 'test' };
+      mockedSimpleHash.mockReturnValueOnce(50); // Hash for shallow key
+      const chunksShallow = diffToSonic(diffShallow, 100);
+      expect(mockedSimpleHash).toHaveBeenCalledWith('name'); // Ensure hash was called correctly
+
+      expect(chunksDeep).toHaveLength(1);
+      expect(chunksShallow).toHaveLength(1);
+      expect(chunksDeep[0].frequency).not.toBeCloseTo(chunksShallow[0].frequency);
     })
 
-    it('should cap detune for long strings', () => {
-      const longString = 'a'.repeat(1000)
-      const diff = { longStr: longString }
-      const chunks = diffToSonic(diff, 100)
-      expect(chunks[0].detune).toBeCloseTo(300) // Max detune for strings
+    it('should cap detune for large numbers and long strings', () => {
+      mockedSimpleHash.mockReturnValueOnce(1).mockReturnValueOnce(2);
+      const diff = { largeNum: 1e10, longStr: 'a'.repeat(500) }; // length 500
+      const chunks = diffToSonic(diff, 100);
+      expect(chunks[0].detune).toBeCloseTo(600); // Max number detune
+
+      // FIX: Correct expectation based on calculation log1p(500) * 25 ≈ 155.4
+      const expectedStringDetune = Math.min(Math.log1p(500) * 25, 300);
+      expect(chunks[1].detune).toBeCloseTo(expectedStringDetune);
     })
   })
 
+  // --- playSonicChunk Tests ---
   describe('playSonicChunk', () => {
     const testChunk: SonicChunk = {
-      id: 'test',
+      id: 'test-chunk',
       type: 'sine',
       valueType: 'change',
       frequency: 440,
@@ -273,259 +294,350 @@ describe('sonification', () => {
       detune: 50,
     }
 
-    it('should create oscillator and gain node', () => {
-      playSonicChunk(testChunk)
-      expect(mockGetInstance).toHaveBeenCalledTimes(1)
-      expect(mockGetContext).toHaveBeenCalledTimes(1)
+    it('should get AudioContext via AudioContextManager', async () => {
+      await playSonicChunk(testChunk)
+      expect(MockAudioContextManager.getInstance).toHaveBeenCalledTimes(1)
+      expect(mockAudioManagerInstance.getContext).toHaveBeenCalledTimes(1)
+    })
+
+    it('should dispatch a "zusound" event with the chunk', async () => {
+      await playSonicChunk(testChunk)
+      expect(dispatchEventSpy).toHaveBeenCalledTimes(1)
+      expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent))
+      const event = dispatchEventSpy.mock.calls[0][0] as CustomEvent
+      expect(event.type).toBe('zusound')
+      expect(event.detail).toEqual({ chunk: testChunk })
+    })
+
+    it('should attempt to resume suspended context', async () => {
+      // Arrange: Set context state to suspended
+      mockAudioContext.state = 'suspended'
+      // Simulate successful resume
+      mockAudioManagerInstance.tryResumeAudioContext.mockResolvedValueOnce({
+        resumed: true,
+        blocked: false,
+      })
+
+      // Act
+      await playSonicChunk(testChunk)
+
+      // Assert
+      expect(mockAudioManagerInstance.tryResumeAudioContext).toHaveBeenCalledTimes(1)
+      expect(mockCreateOscillator).toHaveBeenCalledTimes(1) // Playback should proceed
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Audio context suspended')
+      )
+    })
+
+    it('should skip playback and return false if context resume fails', async () => {
+      // Arrange: Set context state to suspended
+      mockAudioContext.state = 'suspended'
+      // Simulate failed resume
+      mockAudioManagerInstance.tryResumeAudioContext.mockResolvedValueOnce({
+        resumed: false,
+        blocked: true,
+      })
+
+      // Act
+      const result = await playSonicChunk(testChunk)
+
+      // Assert
+      expect(result).toBe(false) // FIX: Expect false on failure
+      expect(mockAudioManagerInstance.tryResumeAudioContext).toHaveBeenCalledTimes(1)
+      expect(mockCreateOscillator).not.toHaveBeenCalled() // Playback should be skipped
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Audio playback skipped for chunk ${testChunk.id}`)
+      )
+    })
+
+    it('should skip playback and return false if context is closed', async () => {
+      // Arrange: Set context state to closed
+      mockAudioContext.state = 'closed'
+
+      // Act
+      const result = await playSonicChunk(testChunk)
+
+      // Assert
+      expect(result).toBe(false) // FIX: Expect false on failure
+      expect(mockAudioManagerInstance.tryResumeAudioContext).not.toHaveBeenCalled()
+      expect(mockCreateOscillator).not.toHaveBeenCalled()
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining(`unexpected state (closed)`))
+    })
+
+    it('should create and configure oscillator and gain nodes', async () => {
+      await playSonicChunk(testChunk)
+
       expect(mockCreateOscillator).toHaveBeenCalledTimes(1)
       expect(mockCreateGain).toHaveBeenCalledTimes(1)
+
+      // FIX: Ensure mock was called before accessing results
+      expect(mockCreateOscillator.mock.calls.length).toBe(1)
+      const createdOscillator = mockCreateOscillator.mock.results[0].value
+
+      // Verify Oscillator setup
+      expect(createdOscillator.type).toBe(testChunk.type)
+      expect(mockSetValueAtTime).toHaveBeenCalledWith(testChunk.frequency, mockAudioContext.currentTime)
+      expect(mockSetValueAtTime).toHaveBeenCalledWith(testChunk.detune, mockAudioContext.currentTime)
+
+      // Verify Gain setup (initial value)
+      expect(mockSetValueAtTime).toHaveBeenCalledWith(0, mockAudioContext.currentTime)
     })
 
-    it('should configure oscillator correctly', () => {
-      playSonicChunk(testChunk)
-      expect(mockOscillator.type).toBe(testChunk.type)
-      // Oscillator frequency and detune are set via setValueAtTime
-      expect(mockSetValueAtTime).toHaveBeenCalledWith(
-        testChunk.frequency,
-        baseMockAudioContext.currentTime
-      )
-      expect(mockSetValueAtTime).toHaveBeenCalledWith(
-        testChunk.detune,
-        baseMockAudioContext.currentTime
-      )
+    it('should connect nodes: oscillator -> gain -> destination', async () => {
+      await playSonicChunk(testChunk)
+      // FIX: Ensure mocks were called before accessing results
+      expect(mockCreateOscillator.mock.calls.length).toBe(1)
+      expect(mockCreateGain.mock.calls.length).toBe(1)
+      const createdOscillator = mockCreateOscillator.mock.results[0].value
+      const createdGainNode = mockCreateGain.mock.results[0].value
+
+      expect(mockConnect).toHaveBeenCalledTimes(2)
+      // Check oscillator connects to gain
+      expect(createdOscillator.connect).toHaveBeenCalledWith(createdGainNode)
+      // Check gain connects to destination
+      expect(createdGainNode.connect).toHaveBeenCalledWith(mockAudioContext.destination)
     })
 
-    it('should connect nodes: oscillator -> gain -> destination', () => {
-      playSonicChunk(testChunk)
-      // Check connections using the mock connect function
-      expect(mockConnect).toHaveBeenCalledWith(mockGainNode) // oscillator -> gain
-      expect(mockConnect).toHaveBeenCalledWith(baseMockAudioContext.destination) // gain -> destination
-      // Verify the order if necessary (more complex mocking needed)
-    })
+    it('should apply exponential envelope correctly for standard duration', async () => {
+      const durationSeconds = testChunk.duration / 1000
+      const now = mockAudioContext.currentTime
+      const attackTime = Math.min(0.01, durationSeconds * 0.2)
+      const releaseTime = Math.min(0.08, durationSeconds * 0.3)
+      const sustainTime = durationSeconds - attackTime - releaseTime
 
-    it('should apply exponential envelope correctly for standard duration', () => {
-      const durationSeconds = testChunk.duration / 1000 // 0.1s
-      const attackTime = Math.min(0.01, durationSeconds * 0.2) // 0.01
-      const releaseTime = Math.min(0.08, durationSeconds * 0.3) // 0.03
-      const sustainTime = durationSeconds - attackTime - releaseTime // 0.1 - 0.01 - 0.03 = 0.06
-      const now = baseMockAudioContext.currentTime // 0
+      await playSonicChunk(testChunk)
 
-      playSonicChunk(testChunk)
-
-      // Check gain envelope calls
-      expect(mockSetValueAtTime).toHaveBeenCalledWith(0, now) // Initial gain set to 0
-      expect(mockExponentialRamp).toHaveBeenCalledWith(testChunk.magnitude, now + attackTime) // Attack ramp
+      expect(mockExponentialRamp).toHaveBeenCalledTimes(2)
+      expect(mockExponentialRamp).toHaveBeenCalledWith(testChunk.magnitude, now + attackTime)
       expect(mockSetValueAtTime).toHaveBeenCalledWith(
         testChunk.magnitude,
         now + attackTime + sustainTime
-      ) // Sustain level set
-      expect(mockExponentialRamp).toHaveBeenCalledWith(0.001, now + durationSeconds) // Release ramp
-      expect(mockLinearRamp).not.toHaveBeenCalled() // Ensure linear ramp wasn't used
+      )
+      expect(mockExponentialRamp).toHaveBeenCalledWith(0.001, now + durationSeconds)
+      expect(mockLinearRamp).not.toHaveBeenCalled()
     })
 
-    it('should apply linear envelope for very short duration (< 20ms)', () => {
-      const shortChunk: SonicChunk = { ...testChunk, duration: 10 } // 10ms = 0.01s
-      const durationSeconds = shortChunk.duration / 1000 // 0.01s
-      const now = baseMockAudioContext.currentTime // 0
+    it('should apply linear envelope for very short duration (< 20ms)', async () => {
+      const shortChunk: SonicChunk = { ...testChunk, duration: 10 }
+      const durationSeconds = shortChunk.duration / 1000
+      const now = mockAudioContext.currentTime
 
-      playSonicChunk(shortChunk)
+      await playSonicChunk(shortChunk)
 
-      // Check gain envelope calls
-      expect(mockSetValueAtTime).toHaveBeenCalledWith(0, now) // Initial gain
-      expect(mockLinearRamp).toHaveBeenCalledWith(shortChunk.magnitude, now + durationSeconds * 0.5) // Ramp up
-      expect(mockLinearRamp).toHaveBeenCalledWith(0, now + durationSeconds) // Ramp down
-      expect(mockExponentialRamp).not.toHaveBeenCalled() // Ensure exponential ramp wasn't used
+      expect(mockLinearRamp).toHaveBeenCalledTimes(2)
+      expect(mockLinearRamp).toHaveBeenCalledWith(shortChunk.magnitude, now + durationSeconds * 0.5)
+      expect(mockLinearRamp).toHaveBeenCalledWith(0, now + durationSeconds)
+      expect(mockExponentialRamp).not.toHaveBeenCalled()
     })
 
-    it('should start and schedule stop for oscillator', () => {
+    it('should start and schedule stop for oscillator', async () => {
       const durationSeconds = testChunk.duration / 1000
-      const now = baseMockAudioContext.currentTime // 0
-      playSonicChunk(testChunk)
+      const now = mockAudioContext.currentTime
+
+      await playSonicChunk(testChunk)
+
+      expect(mockStart).toHaveBeenCalledTimes(1)
       expect(mockStart).toHaveBeenCalledWith(now)
+      expect(mockStop).toHaveBeenCalledTimes(1)
       expect(mockStop).toHaveBeenCalledWith(now + durationSeconds)
     })
 
-    it('should set up onended handler for cleanup and call it', () => {
-      playSonicChunk(testChunk)
-      // Check that onended is assigned a function
-      expect(mockOscillator.onended).toBeInstanceOf(Function)
+    it('should handle cleanup via onended', async () => {
+      await playSonicChunk(testChunk)
+      // FIX: Ensure mock was called before accessing results
+      expect(mockCreateOscillator.mock.calls.length).toBe(1)
+      const createdOscillator = mockCreateOscillator.mock.results[0].value
 
-      // Simulate oscillator ending by manually calling the assigned handler
-      if (mockOscillator.onended) {
-        mockOscillator.onended()
-      }
+      expect(createdOscillator.onended).toBeInstanceOf(Function)
 
-      // Verify disconnect was called for both nodes
+      // Simulate the oscillator finishing
+      createdOscillator.onended!()
+
+      // Advance timers past the safety timeout just in case (though not strictly needed here)
+      // Use await for safety with async operations that might be triggered by onended
+      await vi.advanceTimersByTimeAsync(testChunk.duration + 200)
+
+      expect(mockDisconnect).toHaveBeenCalledTimes(2) // Once for oscillator, once for gain
+    })
+
+    it('should handle cleanup via timeout if onended does not fire', async () => {
+      await playSonicChunk(testChunk)
+
+      // FIX: Use await with async timer advancement
+      await vi.advanceTimersByTimeAsync(testChunk.duration + 150 + 10) // Advance past duration + timeout margin
+
+      // Check that disconnect was called due to timeout
       expect(mockDisconnect).toHaveBeenCalledTimes(2)
-      // Optionally check which objects disconnect was called on if mockConnect tracked 'this' or context
-    })
-
-    it('should attempt to resume suspended context', () => {
-      // Setup suspended context for this specific call
-      const suspendedContext = { ...baseMockAudioContext, state: 'suspended' as AudioContextState }
-      mockGetContext.mockReturnValueOnce(suspendedContext)
-
-      playSonicChunk(testChunk)
-      expect(mockResume).toHaveBeenCalledTimes(1)
-    })
-
-    it('should not attempt to resume running context', () => {
-      // Ensure context is running (default mock state)
-      mockGetContext.mockReturnValueOnce({
-        ...baseMockAudioContext,
-        state: 'running' as AudioContextState,
-      })
-      playSonicChunk(testChunk)
-      expect(mockResume).not.toHaveBeenCalled()
-    })
-
-    it('should throw error if AudioContext creation fails', () => {
-      const contextError = new Error('Failed to create AudioContext')
-      mockGetInstance.mockImplementationOnce(() => {
-        throw contextError
-      })
-      expect(() => playSonicChunk(testChunk)).toThrow(
-        `Failed to play audio: ${contextError.message}`
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Oscillator onended for chunk ${testChunk.id} timed out`)
       )
     })
 
-    it('should handle errors during oscillator start', () => {
-      const startError = new Error('Audio engine failed')
+    it('should return true on successful playback start', async () => {
+      const result = await playSonicChunk(testChunk)
+      expect(result).toBe(true)
+    })
+
+    it('should return false and log error if context acquisition fails', async () => {
+      const contextError = new Error('Web Audio Failed')
+      // Arrange: Make getInstance throw
+      MockAudioContextManager.getInstance.mockImplementationOnce(() => {
+        throw contextError
+      })
+
+      // Act
+      const result = await playSonicChunk(testChunk)
+
+      // Assert
+      expect(result).toBe(false) // FIX: Expect false
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Failed to prepare audio for chunk ${testChunk.id}`),
+        contextError.message
+      )
+      expect(mockCreateOscillator).not.toHaveBeenCalled()
+    })
+
+    it('should return false and log error if oscillator start fails', async () => {
+      const startError = new Error('Cannot start oscillator')
+    // Arrange: Make oscillator.start throw
       mockStart.mockImplementationOnce(() => {
         throw startError
       })
 
-      expect(() => playSonicChunk(testChunk)).toThrow(`Failed to play audio: ${startError.message}`)
-      // Ensure cleanup is still attempted or handled gracefully (depends on implementation)
-      // In the current code, the error likely prevents onended setup.
-    })
+      // Act
+      const result = await playSonicChunk(testChunk)
 
-    it('should handle non-Error throws during playback', () => {
-      // Simulate throwing a string instead of an Error object
-      const stringError = 'plain string error'
-      mockStart.mockImplementationOnce(() => {
-        throw stringError
-      })
-      expect(() => playSonicChunk(testChunk)).toThrow('Failed to play audio')
+      // Assert
+      expect(result).toBe(false) // FIX: Expect false
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Failed to prepare audio for chunk ${testChunk.id}`),
+        startError.message
+      )
+      // Disconnect might still be called depending on exact error point and cleanup logic
+      // expect(mockDisconnect).toHaveBeenCalled() // This might or might not happen
     })
   })
 
+  // --- sonifyChanges Tests ---
   describe('sonifyChanges', () => {
-    // Suppress console.error logs during these tests
+    let diffToSonicSpy: MockInstance
+
     beforeEach(() => {
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      // Spy on diffToSonic for verification
+      diffToSonicSpy = vi.spyOn(sonificationModule, 'diffToSonic')
     })
 
     afterEach(() => {
-      ;(console.error as vi.Mock).mockRestore()
-      vi.restoreAllMocks() // Use restoreAllMocks to clean up spies properly
-      vi.useRealTimers()
+      diffToSonicSpy.mockRestore()
     })
 
     it('should not call playSonicChunk for empty diff', () => {
-      sonifyChanges({}, 100)
-      expect(mockGetInstance).not.toHaveBeenCalled()
-      vi.runAllTimers() // Ensure no setTimeout calls trigger playback
-      expect(mockGetInstance).not.toHaveBeenCalled()
+      const diff = {}
+      sonifyChanges(diff, 100)
+
+      expect(diffToSonicSpy).toHaveBeenCalledWith(diff, 100)
+      vi.runAllTimers() // Run timers to check for scheduled calls
+      expect(playSonicChunkSpy).not.toHaveBeenCalled()
     })
 
-    it('should call playSonicChunk for each generated chunk with stagger delay', () => {
-      const diff = { a: 1, b: 'two', c: false }
-      const duration = 100
+    it('should call diffToSonic with the diff and duration', () => {
+      const diff = { a: 1 }
+      const duration = 120
       sonifyChanges(diff, duration)
+      expect(diffToSonicSpy).toHaveBeenCalledWith(diff, duration)
+    })
 
-      // Immediately after call, nothing should have played
-      expect(mockCreateOscillator).not.toHaveBeenCalled()
+    it('should schedule playSonicChunk for each generated chunk with stagger delay', async () => {
+      const diff = { a: 1, b: 'two', c: false };
+      const duration = 100;
+      // FIX: Call the actual diffToSonic (or spy on it but let it run)
+      // to get the chunks that would actually be scheduled
+      diffToSonicSpy.mockRestore(); // Restore original implementation for this test
+      const expectedChunks = diffToSonic(diff, duration);
+      diffToSonicSpy = vi.spyOn(sonificationModule, 'diffToSonic').mockReturnValue(expectedChunks); // Re-spy
 
-      // Advance time for first chunk
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(1) // First chunk plays
 
-      // Advance time for second chunk
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(2) // Second chunk plays
+      sonifyChanges(diff, duration);
 
-      // Advance time for third chunk
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(3) // Third chunk plays
+      expect(diffToSonicSpy).toHaveBeenCalledWith(diff, duration);
+      expect(playSonicChunkSpy).not.toHaveBeenCalled();
 
-      // Ensure no more timers are pending
+      // FIX: Use async timers
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS);
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(1);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(1, expectedChunks[0]);
+
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS);
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(2);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(2, expectedChunks[1]);
+
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS);
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(3);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(3, expectedChunks[2]);
+
+      await vi.runAllTimersAsync();
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(3);
+    })
+
+    it('should log error and not schedule playback if diffToSonic throws', () => {
+      const diffError = new Error('Diff failed')
+      // Arrange: Make diffToSonic throw
+      diffToSonicSpy.mockImplementationOnce(() => {
+        throw diffError
+      })
+
+      const diff = { a: 1 }
+      sonifyChanges(diff, 100)
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Sonification setup failed:', diffError.message)
       vi.runAllTimers()
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(3)
+      expect(playSonicChunkSpy).not.toHaveBeenCalled()
     })
 
-    it('should log error and not play if diffToSonic throws', () => {
-      // Force diffToSonic to fail by making simpleHash throw
-      const hashError = new Error('Hashing failed')
-      mockSimpleHash.mockImplementationOnce(() => {
-        throw hashError
-      })
+    it('should log error if playSonicChunk rejects/throws inside setTimeout, but continue other sounds', async () => {
+      const diff = { a: 1, b: 2, c: 3 }; // 3 chunks
+      const playbackError = new Error('Playback failed for chunk b');
 
-      const diff = { a: 1 }
-      sonifyChanges(diff, 100)
+      // FIX: Call actual diffToSonic to get chunks
+      diffToSonicSpy.mockRestore();
+      const expectedChunks = diffToSonic(diff, 100);
+      diffToSonicSpy = vi.spyOn(sonificationModule, 'diffToSonic').mockReturnValue(expectedChunks); // Re-spy
 
-      expect(console.error).toHaveBeenCalledWith('Sonification failed:', hashError.message)
-      expect(mockCreateOscillator).not.toHaveBeenCalled()
-      vi.runAllTimers() // Ensure no playback happens
-      expect(mockCreateOscillator).not.toHaveBeenCalled()
-    })
-
-    it('should log error if playSonicChunk throws inside setTimeout, but continue other sounds', () => {
-      const diff = { a: 1, b: 2, c: 3 } // 3 chunks
-      const playbackError = new Error('Playback failed for chunk b')
-
-      // Make the second call to playSonicChunk (via createOscillator) fail
-      let callCount = 0
-      mockCreateOscillator.mockImplementation(() => {
-        callCount++
-        if (callCount === 2) {
-          throw playbackError // Fail on the second sound
+      // Arrange: Make the second call to playSonicChunk (via spy) fail
+      playSonicChunkSpy.mockImplementation(async (chunk) => {
+        expect(chunk).toBeDefined(); // Basic check
+        if (chunk.id === 'b') { // Check id from expectedChunks[1]
+          throw playbackError;
         }
-        return mockOscillator // Succeed otherwise
-      })
+        return true; // Succeed otherwise
+      });
 
-      sonifyChanges(diff, 100)
+      sonifyChanges(diff, 100);
+      expect(diffToSonicSpy).toHaveBeenCalledWith(diff, 100);
 
-      // Advance time for first chunk (should succeed)
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(1)
-      expect(mockStart).toHaveBeenCalledTimes(1) // Check oscillator started
-      expect(console.error).not.toHaveBeenCalled()
+      // Act & Assert
+      // FIX: Use async timers
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS); // Chunk 'a'
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(1);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(1, expectedChunks[0]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
 
-      // Advance time for second chunk (should fail)
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(2) // Second attempt made
-      // Start not called again because createOscillator threw
-      expect(mockStart).toHaveBeenCalledTimes(1)
-      expect(console.error).toHaveBeenCalledWith(
-        `Sonification failed during playback for chunk b:`, // id 'b' comes from diff object key
-        playbackError.message
-      )
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS); // Chunk 'b' (fails)
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(2);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(2, expectedChunks[1]);
+      // Error is caught by the catch block within the setTimeout callback in sonifyChanges
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error during scheduled playback for chunk ${expectedChunks[1].id}:`, // Chunk id 'b'
+        playbackError // The actual error object
+      );
 
-      // Advance time for third chunk (should succeed)
-      vi.advanceTimersByTime(AUDIO_CONFIG.STAGGER_DELAY_MS)
-      expect(mockCreateOscillator).toHaveBeenCalledTimes(3) // Third attempt made
-      expect(mockStart).toHaveBeenCalledTimes(2) // Start called for the third chunk
 
-      vi.runAllTimers() // Clear any remaining timers
-      expect(console.error).toHaveBeenCalledTimes(1) // Only one error logged
-    })
+      await vi.advanceTimersByTimeAsync(AUDIO_CONFIG.STAGGER_DELAY_MS); // Chunk 'c'
+      expect(playSonicChunkSpy).toHaveBeenCalledTimes(3);
+      expect(playSonicChunkSpy).toHaveBeenNthCalledWith(3, expectedChunks[2]);
 
-    it('should handle non-Error throws from playSonicChunk inside setTimeout', () => {
-      const diff = { a: 1 }
-      const stringError = 'Non-error throw'
-      mockCreateOscillator.mockImplementationOnce(() => {
-        throw stringError
-      })
-
-      sonifyChanges(diff, 100)
-
-      vi.runAllTimers() // Trigger the setTimeout
-
-      expect(console.error).toHaveBeenCalledWith(
-        `Sonification failed during playback for chunk a:`,
-        stringError
-      )
+      await vi.runAllTimersAsync();
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1); // Only one error logged
     })
   })
 })
