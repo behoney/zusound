@@ -1,3 +1,4 @@
+// packages/core/traceMiddleware.ts
 import type { StateCreator, StoreApi, StoreMutatorIdentifier } from 'zustand/vanilla'
 import { calculateDiff } from '../diff'
 // Import ZusoundMutatorTuple, TraceData, TraceOptions, TraceImpl from core types
@@ -42,7 +43,6 @@ const processTrace = <T>(
     console.error('[Zusound Core] Error in onTrace callback:', error)
   }
 }
-
 /**
  * Creates a wrapped setState function that includes tracing logic.
  * This wrapped function is passed to the *next* initializer in the chain.
@@ -58,28 +58,32 @@ const createTracedSetState = <T>(
 ): StoreApi<T>['setState'] => {
   const { getState } = api // Use getState from the provided API
 
-  const tracedSetState: StoreApi<T>['setState'] = (state, replace, action) => {
+  // Define the implementation signature broadly to accept potential args like 'action'
+  // The type assigned via return assertion will handle the overload matching.
+  const tracedSetStateImpl = (
+    // Use a general name like 'partial' to align with Zustand terminology
+    partial: T | Partial<T> | ((state: T) => T | Partial<T>),
+    replace?: boolean,
+    // Allow the optional action parameter often added by devtools
+    action?: string | object | { type: unknown;[key: string]: unknown }
+  ) => {
     const timestampStart = Date.now()
     const prevState = getState() // Get state *before* update
 
-    // Call the original setState to update the state.
-    // The original setState might be from another middleware (like devtools, persist, immer)
-    // or the final store setState.
-    originalSetState(state, replace, action)
+      // Call the original setState to update the state.
+      // Pass all arguments received.
+      // Using 'any' temporarily for the call to satisfy potential variations
+      // in the originalSetState signature from other middlewares.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ; (originalSetState as any)(partial, replace, action)
 
     const nextState = getState() // Get state *after* update
     const timestampEnd = Date.now()
 
     // Avoid tracing if the state hasn't actually changed (shallow check)
-    // Note: Even if values are shallow equal, if the object reference changes,
-    // we still trace it because it might trigger re-renders. The diffFn handles
-    // reporting actual value differences.
     if (prevState === nextState) {
-      // console.log('[Zusound Core] State reference unchanged, skipping trace.'); // Optional: for debugging
       return
     }
-
-    // console.log('[Zusound Core] State changed, tracing...', { prevState, nextState, action }); // Optional: for debugging
 
     // Calculate the trace data using the helper function.
     const traceData = calculateTraceData(
@@ -88,14 +92,17 @@ const createTracedSetState = <T>(
       timestampStart,
       timestampEnd,
       diffFn,
-      action
+      action // Pass the action along
     )
 
     // Process the trace data using the helper function.
     processTrace(traceData, onTrace)
   }
 
-  return tracedSetState
+  // Use a type assertion here. This tells TypeScript that our
+  // implementation function (tracedSetStateImpl) is compatible with
+  // the required StoreApi<T>['setState'] overloaded type.
+  return tracedSetStateImpl as StoreApi<T>['setState']
 }
 
 /**
@@ -117,33 +124,34 @@ export const traceImpl: TraceImpl =
     initializer: StateCreator<T, Mps, Mcs, U>,
     options: TraceOptions<T> = {}
   ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> => // This is the StateCreator returned by traceImpl
-  (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => {
-    // These are provided by the outer middleware/Zustand
-    const {
-      // Default onTrace does nothing if not provided.
-      onTrace = () => {},
-      // Use the default diff function if none is provided.
-      diffFn = calculateDiff as (prevState: T, nextState: T) => DiffResult<T>,
-    } = options
+    (set: StoreApi<T>['setState'], get: StoreApi<T>['getState'], api: StoreApi<T>) => {
+      // These are provided by the outer middleware/Zustand
+      const {
+    // Default onTrace does nothing if not provided.
+        onTrace = () => { },
+        // Use the default diff function if none is provided.
+        diffFn = calculateDiff as (prevState: T, nextState: T) => DiffResult<T>,
+      } = options
 
-    // Create the traced version of setState, wrapping the 'set' function
-    // that was provided by the outer middleware or Zustand itself.
-    const tracedSetState = createTracedSetState(set, api, diffFn, onTrace)
+      // Create the traced version of setState, wrapping the 'set' function
+      // that was provided by the outer middleware or Zustand itself.
+      const tracedSetState = createTracedSetState(set, api, diffFn, onTrace)
 
-    // Call the original initializer with the traced set function.
-    // The initializer will then use this traced function for its state updates.
-    // The initializer returns the initial state slice.
-    const initialState = initializer(
+      // Call the original initializer with the traced set function.
+      // *** FIX: Use a type assertion here ('as any' is common practice for this specific case) ***
+      // This bridges the gap between the base StoreApi<T>['setState'] type of tracedSetState
+      // and the complex generic type expected by the initializer based on Mps.
+      const initialState = initializer(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tracedSetState as any, // Use 'any' to bypass complex type checks
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      get as any, // Use 'any' to bypass complex type checks
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      api as any // Use 'any' to bypass complex type checks
-    )
+        tracedSetState as any, // Assert compatibility
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        get as any, // Also assert 'get' for consistency, though often less problematic
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        api as any // Assert 'api' as well
+      )
 
-    // The StateCreator returned by traceImpl simply returns the initial state slice
-    // received from the initializer. Its type signature correctly declares
-    // that the 'zustand/zusound' mutator has been added to the Mcs list.
-    return initialState
-  }
+      // The StateCreator returned by traceImpl simply returns the initial state slice
+      // received from the initializer. Its type signature correctly declares
+      // that the 'zustand/zusound' mutator has been added to the Mcs list.
+      return initialState
+    }
