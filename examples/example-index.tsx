@@ -16,7 +16,7 @@ const exampleLinks: ExampleLink[] = [
     description:
       'Demonstrates fundamental integration with two simple stores, showcasing sound feedback for various data types (number, string, boolean, object property addition). Includes source code viewer.',
     path: '/basic',
-    image: `${import.meta.env.BASE_URL}examples/assets/basic-usage.png`,
+    image: `${import.meta.env.BASE_URL}examples/assets/basic.png`,
   },
   {
     id: 'todo',

@@ -3,8 +3,8 @@ import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
 import { zusound } from '../../packages'
-import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
-import middlewaresSource from './Middlewares.tsx?raw' // Import raw source code
+import { CodeViewer } from '../code-viewer' // Import the CodeViewer
+import middlewaresSource from './middlewares-example.tsx?raw' // Import raw source code
 
 // Define the store state interface
 interface CounterState {

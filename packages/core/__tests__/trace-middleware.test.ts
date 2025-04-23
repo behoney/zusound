@@ -1,7 +1,7 @@
 // packages/core/__tests__/traceMiddleware.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach, Mock, type MockInstance } from 'vitest'
 import { createStore, type StoreApi, type StateCreator } from 'zustand/vanilla'
-import { trace } from '../' // Import the public trace middleware API
+import { trace } from '..' // Import the public trace middleware API
 import { calculateSimpleDiff } from '../../diff' // Import the actual simple diff for comparison if needed
 import type { DiffResult, DetailedDiff } from '../../diff' // Import diff types
 import type { TraceOptions, TraceData } from '../types' // Import core types

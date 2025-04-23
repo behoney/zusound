@@ -46,7 +46,7 @@ const createZusoundStore = <T extends object>(
 // --- Test Suite ---
 
 describe('zusound Middleware', () => {
-    let store: TestStore | undefined
+    let store: TestStore | undefined차
     let userOnTraceMock: Mock<(data: TraceData<TestState>) => void>
     let consoleErrorSpy: MockInstance
     let dispatchEventSpy: MockInstance
