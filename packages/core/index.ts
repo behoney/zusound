@@ -12,7 +12,7 @@
  */
 
 // Import the implementation function
-import { traceImpl as traceMiddlewareImpl } from './traceMiddleware'
+import { traceImpl as traceMiddlewareImpl } from './trace-middleware'
 // Import public type definitions from the types file
 import type {
   Trace,

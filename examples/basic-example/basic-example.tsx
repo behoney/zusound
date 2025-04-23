@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { zusound } from '../../packages' // Assuming correct relative path
-import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
-import basicUsageSource from './BasicUsage.tsx?raw' // Import raw source code
+import { CodeViewer } from '../code-viewer' // Import the CodeViewer
+import basicUsageSource from './basic-example.tsx?raw' // Import raw source code
 
 // --- Zustand Stores ---
 
