@@ -1,7 +1,13 @@
 import type { StoreMutatorIdentifier as ZustandStoreMutatorIdentifier, StateCreator } from 'zustand'
-// Import ZusoundMutatorTuple, TraceOptions and TraceData from core
-import type { ZusoundMutatorTuple, TraceOptions, TraceData } from '../core'
+import type { TraceOptions, TraceData } from '../core'
 import type { DiffResult } from '../diff' // Import DiffResult
+
+/**
+ * Defines the unique mutator identifier tuple for zusound.
+ * Changed `never` to `unknown` to align with Zustand's internal generic constraints
+ * on `Mps` and `Mcs` which use `[StoreMutatorIdentifier, unknown][]`.
+ */
+export type ZusoundMutatorTuple = ['zustand/zusound', never]
 
 /**
  * Interface for zusound middleware options.
@@ -42,15 +48,14 @@ export interface ZusoundOptions<T> extends Omit<TraceOptions<T>, 'onTrace' | 'di
  */
 export interface Zusound {
   <
-    T extends object, // Base state type
+    T, // Base state type
     Mps extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Past Set
     Mcs extends [ZustandStoreMutatorIdentifier, unknown][] = [], // Middleware Current Set
-    U = T, // Initial state slice type
   >(
     // The initializer receives Mps and Mcs from the previous middleware
-    initializer: StateCreator<T, Mps, Mcs, U>,
+    initializer: StateCreator<T, Mps, Mcs>,
     options?: ZusoundOptions<T>
-  ): StateCreator<T, Mps, [...Mcs, ZusoundMutatorTuple], U> // Returns StateCreator with ZusoundMutatorTuple added to Mcs
+  ): StateCreator<T, Mps, [ZusoundMutatorTuple, ...Mcs]>
 }
 
 // Note: The `StoreMutators` augmentation is handled in packages/core/types.d.ts

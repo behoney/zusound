@@ -19,7 +19,6 @@ import type {
   TraceOptions,
   TraceData,
   ZusoundTraceEventDetail,
-  ZusoundMutatorTuple,
 } from './types' // Import ZusoundMutatorTuple
 
 // Export the implementation but assert its type to the public Trace signature

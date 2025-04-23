@@ -248,3 +248,33 @@ zusound is inspired by the excellent [Zustand](https://github.com/pmndrs/zustand
 - **Accessibility**: Add an audio dimension to your application that can benefit visually impaired users
 - **Presentations**: Use generated sound patterns when demonstrating your application in talks or videos
 - **Creative Coding**: Explore the intersection of state management and generative audio
+
+
+---
+
+Component interfaces:
+1. diff : (prevState: any, nextState: any) => diffChunk
+  - get prevState and nextState
+  - generate diffChunk event
+
+
+2. core : (newState: T) => SonicChunk
+  - get newState
+  - get prevState
+  - call diff
+
+  - on diff event, generate SonicChunk event
+
+
+3. middleware : (zustandStore: SonicChunk) => zustandStore
+  - get zustand store
+    - call 
+  - return zustand store
+
+4. sonification : (SonicChunk: string) => void
+  - listen to SonicChunk Event
+  - play SonicChunk (void)
+
+5. visualizer: (SonicChunk: string) => void
+  - listen to SonicChunk Event
+  - display SonicChunk (void)
