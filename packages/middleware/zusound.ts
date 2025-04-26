@@ -3,6 +3,8 @@ import coreImpl, { CoreOptions } from '../core'
 import { isProduction } from './utils'
 import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk'
 import { sonifyChanges } from '../sonification'
+import { DIFF_CHUNK_EVENT_NAME } from '../shared-types/diff-chunk'
+import { DiffChunk } from '../shared-types/diff-chunk'
 
 type Cast<T, U> = T extends U ? T : U
 type Write<T, U> = Omit<T, keyof U> & U
@@ -90,10 +92,23 @@ const zusoundImpl: ZusoundImpl =
       return coreImpl(state, prevState, options)
     })
 
-    window.addEventListener(SONIC_CHUNK_EVENT_NAME, event => {
-      const { detail } = event as CustomEvent<SonicChunk>
-      sonifyChanges(detail, 100)
-    })
+    if (typeof window !== 'undefined' && !(SONIC_CHUNK_EVENT_NAME in window)) {
+      window[SONIC_CHUNK_EVENT_NAME] = 'SONIC_CHUNK_EVENT_NAME'
+      console.log('listening', 'SONIC_CHUNK_EVENT_NAME')
+      window.addEventListener(SONIC_CHUNK_EVENT_NAME, event => {
+        const { detail } = event as CustomEvent<SonicChunk>
+        sonifyChanges(detail, 100)
+      })
+    }
+
+    if (typeof window !== 'undefined' && !(DIFF_CHUNK_EVENT_NAME in window)) {
+      window[DIFF_CHUNK_EVENT_NAME] = 'DIFF_CHUNK_EVENT_NAME'
+      console.log('listening', 'DIFF_CHUNK_EVENT_NAME')
+      window.addEventListener(DIFF_CHUNK_EVENT_NAME, event => {
+        const { detail } = event as CustomEvent<DiffChunk>
+        console.log('diffChunk', detail)
+      })
+    }
 
     return initialState
   }

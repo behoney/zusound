@@ -263,6 +263,7 @@ Component interfaces:
   - restore prevState
   - call diff
     - get diffChunk return
+    - dispatch DiffChunk event
     - generate SonicChunk
     - dispatch SonicChunk event
 
@@ -278,6 +279,6 @@ Component interfaces:
   - listen to SonicChunk Event
   - play SonicChunk (void)
 
-5. visualizer: (SonicChunk: string) => void
-  - listen to SonicChunk Event
-  - display SonicChunk (void)
+5. (WIP) visualizer: (DiffChunk: string) => void 
+  - listen to DiffChunk Event
+  - display DiffChunk (void)
