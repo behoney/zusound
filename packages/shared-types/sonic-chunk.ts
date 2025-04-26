@@ -1,3 +1,4 @@
+export const SONIC_CHUNK_EVENT_NAME = '__ZUSOUND_SONIC_CHUNK__'
 /**
  * Represents a single sonic event (sound) that will be played
  * based on a state change in the application
@@ -5,7 +6,6 @@
 export type SonicChunk = {
   /**
    * Unique identifier for this chunk, typically the key path of the changed state
-   * Example: "user.preferences.theme"
    */
   id: string
 

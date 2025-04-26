@@ -6,3 +6,4 @@
 
 // Export SonicChunk type directly to prevent import issues
 export type { SonicChunk } from './sonic-chunk.ts'
+export type { DiffChunk } from './diff-chunk.ts'

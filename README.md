@@ -255,21 +255,24 @@ zusound is inspired by the excellent [Zustand](https://github.com/pmndrs/zustand
 Component interfaces:
 1. diff : (prevState: any, nextState: any) => diffChunk
   - get prevState and nextState
-  - generate diffChunk event
+  - return diffChunk
 
 
-2. core : (newState: T) => SonicChunk
+2. core aka trace : (newState: T) => SonicChunk
   - get newState
-  - get prevState
+  - restore prevState
   - call diff
+    - get diffChunk return
+    - generate SonicChunk
+    - dispatch SonicChunk event
 
-  - on diff event, generate SonicChunk event
 
-
-3. middleware : (zustandStore: SonicChunk) => zustandStore
+3. middleware : (zustandStore) => zustandStore
   - get zustand store
-    - call 
-  - return zustand store
+    - call core
+      - get SonicChunk
+      - dispatch SonicChunk event
+  - return zustand store ( actually doing nothing )
 
 4. sonification : (SonicChunk: string) => void
   - listen to SonicChunk Event

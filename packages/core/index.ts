@@ -1,31 +1,78 @@
-/**
- * Core module for the Zustand state tracking middleware.
- *
- * This module serves as the central orchestration point that:
- * - Tracks state changes in Zustand stores
- * - Calculates meaningful differences between state versions
- * - Triggers audio feedback (sonification) based on those changes (indirectly via event)
- *
- * The middleware pattern provides a clean, minimal API surface while
- * internally coordinating the diff calculation and sonification logic
- * from their respective packages.
- */
+import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk'
+import { DiffChunk } from '../shared-types'
+import diff from '../diff/diff'
 
-// Import the implementation function
-import { traceImpl as traceMiddlewareImpl } from './trace-middleware'
-// Import public type definitions from the types file
-import type {
-  Trace,
-  TraceOptions,
-  TraceData,
-  ZusoundTraceEventDetail,
-} from './types' // Import ZusoundMutatorTuple
+export interface CoreOptions {
+  enabled?: boolean
+  // name?: string
+  // enabled?: boolean
+  // anonymousActionType?: string
+  // store?: string
+}
 
-// Export the implementation but assert its type to the public Trace signature
-// This assertion is less of a 'lie' now that traceImpl's signature is Trace
-export const trace = traceMiddlewareImpl as Trace
+type CoreImpl = (
+  currentState: unknown | Record<string, unknown>,
+  prevState: unknown | Record<string, unknown>,
+  options: CoreOptions
+) => void
 
-// Re-export types for consumers of the core package
-export type { TraceOptions, TraceData, Trace, ZusoundTraceEventDetail, ZusoundMutatorTuple } // Re-export ZusoundMutatorTuple
-// Re-export DiffResult from its source package
-export type { DiffResult } from '../diff'
+const coreImpl: CoreImpl = (currentState, prevState, options) => {
+  const { enabled = true } = options
+
+  if (!enabled) {
+    return
+  }
+
+  // console.log('currentState', currentState, prevState)
+
+  const traceableRecord: Record<string, unknown> = {}
+  const prevTraceableRecord: Record<string, unknown> = {}
+
+  for (const key in currentState as Record<string, unknown>) {
+    if (typeof key !== 'string') continue
+
+    if (typeof currentState[key] !== 'function') {
+      traceableRecord[key] = currentState[key]
+      prevTraceableRecord[key] = prevState[key]
+    }
+  }
+
+  const diffChunk = diff(traceableRecord, prevTraceableRecord)
+  const sonicChunk = diffChunkToSonicChunk(diffChunk)
+
+  window.dispatchEvent(new CustomEvent(SONIC_CHUNK_EVENT_NAME, { detail: sonicChunk }))
+}
+
+export default coreImpl
+
+const diffChunkToSonicChunk = (diffChunk: DiffChunk): SonicChunk => {
+  const waveformMap: Record<DiffChunk['type'], SonicChunk['type']> = {
+    add: 'square',
+    remove: 'triangle',
+    change: 'sine',
+  }
+
+  const valueTypeMap = (valueType: DiffChunk['valueType']): SonicChunk['valueType'] => {
+    if (
+      valueType === 'string' ||
+      valueType === 'number' ||
+      valueType === 'boolean' ||
+      valueType === 'object' ||
+      valueType === 'array' ||
+      valueType === 'unknown'
+    ) {
+      return 'change'
+    }
+    return 'change'
+  }
+
+  return {
+    id: diffChunk.id,
+    type: waveformMap[diffChunk.type] || 'sine',
+    valueType: valueTypeMap(diffChunk.valueType),
+    frequency: 440,
+    magnitude: diffChunk.type === 'remove' ? 0.3 : 0.5,
+    duration: 100,
+    detune: 0,
+  }
+}
