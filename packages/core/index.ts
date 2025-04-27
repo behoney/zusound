@@ -1,8 +1,8 @@
-import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk'
+import { SONIC_CHUNK_EVENT_NAME } from '../shared-types/sonic-chunk'
 import { DiffChunk } from '../shared-types'
 import diff, { isDiffable } from '../diff/diff'
 import { DIFF_CHUNK_EVENT_NAME } from '../shared-types/diff-chunk'
-import { diffChunkToSonicChunk, diffToSonic, sonifyChanges } from '../sonification/sonification'
+import { diffToSonic, sonifyChanges } from '../sonification/sonification'
 
 export interface CoreOptions {
   enabled?: boolean

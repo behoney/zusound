@@ -293,21 +293,24 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
       await new Promise<void>(resolve => {
         let resolved = false
         // Timeout based on actual duration plus buffer
-        const timeoutId = setTimeout(() => {
-          if (!resolved) {
-            console.warn(`Oscillator onended for chunk ${chunk.id} timed out. Force cleaning up.`)
-            try {
-              oscillator.disconnect()
-              filterNode.disconnect()
-              gainNode.disconnect()
-              pannerNode.disconnect()
-            } catch {
-              /* ignore */
+        const timeoutId = setTimeout(
+          () => {
+            if (!resolved) {
+              console.warn(`Oscillator onended for chunk ${chunk.id} timed out. Force cleaning up.`)
+              try {
+                oscillator.disconnect()
+                filterNode.disconnect()
+                gainNode.disconnect()
+                pannerNode.disconnect()
+              } catch {
+                /* ignore */
+              }
+              resolved = true
+              resolve()
             }
-            resolved = true
-            resolve()
-          }
-        }, duration * 1000 + 150)
+          },
+          duration * 1000 + 150
+        )
 
         oscillator.onended = () => {
           if (!resolved) {

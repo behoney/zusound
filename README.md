@@ -249,36 +249,39 @@ zusound is inspired by the excellent [Zustand](https://github.com/pmndrs/zustand
 - **Presentations**: Use generated sound patterns when demonstrating your application in talks or videos
 - **Creative Coding**: Explore the intersection of state management and generative audio
 
-
 ---
 
 Component interfaces:
-1. diff : (prevState: any, nextState: any) => diffChunk
-  - get prevState and nextState
-  - return diffChunk
 
+1. diff : (prevState: any, nextState: any) => diffChunk
+
+- get prevState and nextState
+- return diffChunk
 
 2. core aka trace : (newState: T) => SonicChunk
-  - get newState
-  - restore prevState
-  - call diff
-    - get diffChunk return
-    - dispatch DiffChunk event
-    - generate SonicChunk
-    - dispatch SonicChunk event
 
+- get newState
+- restore prevState
+- call diff
+  - get diffChunk return
+  - dispatch DiffChunk event
+  - generate SonicChunk
+  - dispatch SonicChunk event
 
 3. middleware : (zustandStore) => zustandStore
-  - get zustand store
-    - call core
-      - get SonicChunk
-      - dispatch SonicChunk event
-  - return zustand store ( actually doing nothing )
+
+- get zustand store
+  - call core
+    - get SonicChunk
+    - dispatch SonicChunk event
+- return zustand store ( actually doing nothing )
 
 4. sonification : (SonicChunk: string) => void
-  - listen to SonicChunk Event
-  - play SonicChunk (void)
 
-5. (WIP) visualizer: (DiffChunk: string) => void 
-  - listen to DiffChunk Event
-  - display DiffChunk (void)
+- listen to SonicChunk Event
+- play SonicChunk (void)
+
+5. (WIP) visualizer: (DiffChunk: string) => void
+
+- listen to DiffChunk Event
+- display DiffChunk (void)

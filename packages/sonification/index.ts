@@ -20,7 +20,6 @@
  * ```
  */
 
-
 // Core sonification functions
 export { sonifyChanges, playSonicChunk } from './sonification'
 
@@ -32,4 +31,3 @@ export { AudioContextManager } from './utils'
 
 // Constants (for advanced configuration)
 export { AUDIO_CONFIG } from './constants'
-

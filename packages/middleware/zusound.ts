@@ -1,8 +1,6 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 import coreImpl, { CoreOptions } from '../core'
-import { isProduction } from './utils'
 import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk'
-import { sonifyChanges } from '../sonification'
 import { DIFF_CHUNK_EVENT_NAME } from '../shared-types/diff-chunk'
 import { DiffChunk } from '../shared-types/diff-chunk'
 

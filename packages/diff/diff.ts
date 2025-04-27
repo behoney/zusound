@@ -105,4 +105,3 @@ export const isDiffable = (value: unknown): value is DiffableType => {
     Array.isArray(value)
   )
 }
-
