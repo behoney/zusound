@@ -16,15 +16,7 @@ export type SonicChunk = {
    * - sawtooth: bright, buzzy sound (used for booleans by default)
    * - triangle: softer, hollow sound (used for objects and removals by default)
    */
-  type: 'sine' | 'square' | 'sawtooth' | 'triangle'
-
-  /**
-   * The type of value change that occurred
-   * - add: New value added to the state (currently unused, treated as 'change')
-   * - remove: Value removed from the state
-   * - change: Value changed in the state
-   */
-  valueType: 'add' | 'remove' | 'change'
+  type: 'sine' | 'square' | 'sawtooth' | 'triangle' | 'custom'
 
   /**
    * Base frequency of the sound in Hertz (Hz)

@@ -96,8 +96,11 @@ const zusoundImpl: ZusoundImpl =
       window[SONIC_CHUNK_EVENT_NAME] = 'SONIC_CHUNK_EVENT_NAME'
       console.log('listening', 'SONIC_CHUNK_EVENT_NAME')
       window.addEventListener(SONIC_CHUNK_EVENT_NAME, event => {
+        // TODO:: Event handling
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { detail } = event as CustomEvent<SonicChunk>
-        sonifyChanges(detail, 100)
+        // sonifyChanges(detail, 100)
+        // console.log('sonicChunk', detail)
       })
     }
 
@@ -105,8 +108,10 @@ const zusoundImpl: ZusoundImpl =
       window[DIFF_CHUNK_EVENT_NAME] = 'DIFF_CHUNK_EVENT_NAME'
       console.log('listening', 'DIFF_CHUNK_EVENT_NAME')
       window.addEventListener(DIFF_CHUNK_EVENT_NAME, event => {
+        // TODO:: Event handling
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { detail } = event as CustomEvent<DiffChunk>
-        console.log('diffChunk', detail)
+        // console.log('diffChunk', detail)
       })
     }
 
