@@ -217,8 +217,9 @@ function TodoItem({ todo }: TodoItemProps) {
 
   return (
     <li
-      className={`flex items-center py-3 border-b border-gray-200 last:border-b-0 ${todo.completed ? 'opacity-60' : ''
-        }`}
+      className={`flex items-center py-3 border-b border-gray-200 last:border-b-0 ${
+        todo.completed ? 'opacity-60' : ''
+      }`}
     >
       <input
         type="checkbox"
@@ -298,13 +299,15 @@ function Controls() {
   }
 
   const getFilterButtonStyle = (controlFilter: Filter) =>
-    `btn text-xs sm:text-sm ${filter === controlFilter ? 'btn-primary' : 'btn-outline hover:bg-gray-100'
+    `btn text-xs sm:text-sm ${
+      filter === controlFilter ? 'btn-primary' : 'btn-outline hover:bg-gray-100'
     }`
 
   const getSortButtonStyle = (controlOrder: SortOrder) =>
-    `btn text-xs sm:text-sm ${sortOrder === controlOrder && !isSorting
-      ? 'btn-secondary' // Indicate active sort order when not currently sorting
-      : 'btn-outline hover:bg-gray-100'
+    `btn text-xs sm:text-sm ${
+      sortOrder === controlOrder && !isSorting
+        ? 'btn-secondary' // Indicate active sort order when not currently sorting
+        : 'btn-outline hover:bg-gray-100'
     } ${isSorting && sortOrder === controlOrder ? 'bg-yellow-200 text-yellow-800 border-yellow-300 animate-pulse' : ''}`
 
   return (

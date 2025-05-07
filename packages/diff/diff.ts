@@ -17,7 +17,7 @@ const diffFunc = <T extends DiffableType>(
   let _diff: string, _diffPower: number
 
   if (prevState === undefined || prevState === null) {
-    _diff = JSON.stringify(nextState).length
+    _diff = JSON.stringify(nextState).length.toString()
     _diffPower = 1
   } else if (nextState === undefined || nextState === null) {
     _diff = JSON.stringify(prevState).length.toString()
@@ -38,7 +38,8 @@ const diffFunc = <T extends DiffableType>(
       case 'undefined':
       default:
         _diffPower =
-          1 - steps / Math.max(JSON.stringify(prevState).length, JSON.stringify(nextState).length)
+          1 -
+          steps / Math.max(1, JSON.stringify(prevState).length, JSON.stringify(nextState).length)
         break
     }
   }
@@ -79,11 +80,12 @@ const getValueType = (value: unknown): ValueOf<Pick<DiffChunk, 'valueType'>> => 
   }
 }
 
-const diffImpl = <T extends DiffableType>(nextState: T, prevState: T): DiffChunk => {
+const diffImpl = <T extends DiffableType>(path: string, nextState: T, prevState: T): DiffChunk => {
   const { diff, diffPower } = diffFunc(prevState, nextState)
 
   const diffChunk: DiffChunk = {
     id: JSON.stringify(nextState),
+    path,
     type: getDiffType(diffPower),
     valueType: getValueType(nextState),
     diff,

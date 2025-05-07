@@ -46,8 +46,7 @@ const useAnotherStore = create<AnotherState>()(
       updateTexts: (str: string) => set({ anotherText: str }), // Simplified update
     }),
     {
-      logDiffs: true, // Enable logging for this store
-      name: 'AnotherStore', // Add name
+      enabled: true,
     }
   )
 )

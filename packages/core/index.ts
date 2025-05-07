@@ -1,15 +1,11 @@
 import { SONIC_CHUNK_EVENT_NAME } from '../shared-types/sonic-chunk'
-import { DiffChunk } from '../shared-types'
+import { DiffChunk, ZusoundSoundEvent, ZusoundDiffEvent } from '../shared-types'
 import diff, { isDiffable } from '../diff/diff'
 import { DIFF_CHUNK_EVENT_NAME } from '../shared-types/diff-chunk'
 import { diffToSonic, sonifyChanges } from '../sonification/sonification'
 
 export interface CoreOptions {
   enabled?: boolean
-  // name?: string
-  // enabled?: boolean
-  // anonymousActionType?: string
-  // store?: string
 }
 
 type CoreImpl = (
@@ -32,24 +28,35 @@ const coreImpl: CoreImpl = (currentState, prevState, options) => {
   for (const key in currentStateRecord) {
     if (typeof key !== 'string') continue
 
-    if (typeof currentStateRecord[key] !== 'function' && isDiffable(currentStateRecord[key])) {
-      const diffChunk = diff(
-        currentStateRecord[key],
-        // @ts-expect-error prevStateRecord[key] is the same type as currentStateRecord[key]
-        prevStateRecord[key]
-      )
-      window.dispatchEvent(new CustomEvent(DIFF_CHUNK_EVENT_NAME, { detail: diffChunk }))
+    if (Object.prototype.hasOwnProperty.call(currentStateRecord, key)) {
+      const currentValue = currentStateRecord[key]
+      const previousValue = prevStateRecord ? prevStateRecord[key] : undefined
 
-      diffChunks.push(diffChunk)
+      if (
+        typeof currentValue !== 'function' &&
+        (isDiffable(currentValue) || isDiffable(previousValue))
+      ) {
+        if (currentValue !== previousValue) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const diffChunk = diff(key, currentValue as any, previousValue as any)
+          const event: ZusoundDiffEvent = new CustomEvent(DIFF_CHUNK_EVENT_NAME, {
+            detail: { chunk: diffChunk },
+          })
+          window.dispatchEvent(event)
+          diffChunks.push(diffChunk)
+        }
+      }
     }
   }
 
   diffChunks.forEach(diffChunk => {
     sonifyChanges(diffChunk, 100)
 
-    // TODO:: below event is reversed
     const sonicChunk = diffToSonic(diffChunk)
-    window.dispatchEvent(new CustomEvent(SONIC_CHUNK_EVENT_NAME, { detail: sonicChunk }))
+    const event: ZusoundSoundEvent = new CustomEvent(SONIC_CHUNK_EVENT_NAME, {
+      detail: { chunk: sonicChunk },
+    })
+    window.dispatchEvent(event)
   })
 }
 

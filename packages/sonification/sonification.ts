@@ -1,7 +1,7 @@
-import { SonicChunk } from './types'
+import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk' // Ensure SONIC_CHUNK_EVENT_NAME is imported
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager } from './utils'
-import { DiffChunk } from '../shared-types'
+import { DiffChunk, ZusoundSoundEvent } from '../shared-types'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
@@ -22,17 +22,18 @@ export function diffToSonic<T extends DiffChunk>(diff: T, duration = 50): SonicC
   }
 
   // Determine value type based on the change
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const valueType = diff.type === 'add' || diff.type === 'remove' ? diff.type : 'change'
 
   // --- Frequency Calculation ---
-  // Map key hash to a base frequency within a scale
-  // Using the potentially flattened key 'key'
-  const octave = Math.floor(diff.id.length / 100) % 3 // Shift up 0, 1, or 2 octaves
-  const scaleIndex = diff.id.length % AUDIO_CONFIG.SCALE.length
+  // Map key hash (from diff.path) to a base frequency within a scale
+  const pathString = String(diff.path) // Ensure path is a string
+  const octave = Math.floor(pathString.length / 10) % 3 // Adjusted divisor for more reasonable octave shifts
+  const scaleIndex = pathString.length % AUDIO_CONFIG.SCALE.length
   let frequency = AUDIO_CONFIG.BASE_FREQUENCY * Math.pow(2, octave) * AUDIO_CONFIG.SCALE[scaleIndex]
 
-  // Adjust frequency by key depth (split the potentially flattened key)
-  const depth = diff.id.split('.').length - 1
+  // Adjust frequency by key depth (split the path)
+  const depth = pathString.split('.').length - 1
   frequency *= 1 + depth * 0.05 // Increase pitch slightly for deeper keys
 
   // Add more dynamic variation based on diff properties
@@ -61,23 +62,26 @@ export function diffToSonic<T extends DiffChunk>(diff: T, duration = 50): SonicC
 
   // --- Detune Calculation (based on value) ---
   let detuneCents = 0
-  const valueOfType = diff.valueType
+  const valueOfType = diff.valueType // This is diff.valueType, not related to diff.type
 
   if (valueOfType === 'number') {
     // Logarithmic scale for number magnitude, capped
     detuneCents = Math.min(Math.log1p(Math.abs(diff.diffPower)) * 50, 600)
   } else if (valueOfType === 'string') {
     // Logarithmic scale for string length, capped
-    detuneCents = Math.min(Math.log1p(diff.diff.length) * 25, 300)
+    // Use diff.diff (which is Levenshtein steps for strings, or length for added/removed)
+    const diffLength = parseInt(diff.diff, 10) // diff.diff is a string
+    detuneCents = Math.min(Math.log1p(isNaN(diffLength) ? 0 : diffLength) * 25, 300)
   } else if (valueOfType === 'boolean') {
-    detuneCents = diff.diffPower ? 25 : -25 // Slight detune for true/false
+    detuneCents = diff.diffPower !== 0 ? (diff.diffPower > 0 ? 25 : -25) : 0 // Slight detune for true/false changes
   } else {
     // Keep detune 0 for objects, arrays, etc. for now
   }
 
   // --- Waveform Mapping ---
   let waveType: SonicChunk['type'] = 'sine' // Default
-  if (valueType === 'remove') {
+  if (diff.type === 'remove') {
+    // Use diff.type here ('add', 'remove', 'change')
     waveType = 'triangle'
   } else {
     if (valueOfType === 'number') {
@@ -87,17 +91,18 @@ export function diffToSonic<T extends DiffChunk>(diff: T, duration = 50): SonicC
     } else if (valueOfType === 'boolean') {
       waveType = 'sawtooth'
     } else {
+      // object, array, unknown
       waveType = 'triangle'
     }
   }
 
   const magnitude =
-    valueType === 'remove'
+    diff.type === 'remove' // Use diff.type here
       ? AUDIO_CONFIG.DEFAULT_MAGNITUDE.REMOVE
       : AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE
 
   return {
-    id: diff.id, // Use the potentially flattened key as ID
+    id: diff.path, // Use the path as the SonicChunk ID
     type: waveType,
     frequency,
     magnitude,
@@ -117,10 +122,10 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
     const audioManager = AudioContextManager.getInstance()
     const ctx = audioManager.getContext() // Ensures context is ready
 
-    // TODO:: remove this
     // Dispatch custom event for visualizer *before* attempting playback
+    // This event is now SONIC_CHUNK_EVENT_NAME
     if (typeof window !== 'undefined') {
-      const event = new CustomEvent('zusound', {
+      const event: ZusoundSoundEvent = new CustomEvent(SONIC_CHUNK_EVENT_NAME, {
         detail: { chunk },
       })
       window.dispatchEvent(event)
@@ -153,12 +158,11 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 
       // Create oscillator with the specific waveform type from the chunk
       const oscillator = ctx.createOscillator()
-      oscillator.type = chunk.type
+      // TODO:: OscillatorType 'custom' should be implemented
+      oscillator.type = chunk.type === 'custom' ? 'sine' : chunk.type // Fallback for 'custom' if not implemented
 
       // Set frequency and detune based on chunk data
-      // Frequency represents the key's position in data structure
       oscillator.frequency.setValueAtTime(chunk.frequency, now)
-      // Detune represents the magnitude of change in the data
       oscillator.detune.setValueAtTime(chunk.detune, now)
 
       // Create gain node for volume envelope
@@ -167,31 +171,29 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 
       // Add stereo panning for spatial variation based on waveform type
       const pannerNode = ctx.createStereoPanner()
-      // Different wave types get different positions in stereo field
       let panValue = 0
       switch (chunk.type) {
         case 'sine':
           panValue = -0.3
-          break // Slightly left
+          break
         case 'square':
           panValue = 0.4
-          break // More right
+          break
         case 'sawtooth':
           panValue = 0.7
-          break // Far right
+          break
         case 'triangle':
+        case 'custom': // Handle 'custom' for panning
           panValue = -0.6
-          break // Far left
+          break
         default:
-          panValue = 0 // Center
+          panValue = 0
       }
-      // Add slight randomization to prevent exact same positioning
       panValue += Math.random() * 0.2 - 0.1
       pannerNode.pan.setValueAtTime(Math.max(-1, Math.min(1, panValue)), now)
 
       // Create a filter for timbral variation
       const filterNode = ctx.createBiquadFilter()
-      // Different filter types/frequencies based on waveform
       switch (chunk.type) {
         case 'sine':
           filterNode.type = 'lowpass'
@@ -207,36 +209,26 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
           filterNode.Q.setValueAtTime(2, now)
           break
         case 'triangle':
+        case 'custom': // TODO:: Handle 'custom' for filter
           filterNode.type = 'lowshelf'
           filterNode.frequency.setValueAtTime(chunk.frequency, now)
           filterNode.gain.setValueAtTime(3, now)
           break
       }
 
-      // Connect the audio graph with the new nodes
       oscillator.connect(filterNode)
       filterNode.connect(gainNode)
       gainNode.connect(pannerNode)
       pannerNode.connect(ctx.destination)
 
-      // Calculate envelope timings based on chunk properties
-      // Shorter attack for 'add' type changes, longer for others
-      const attackRatio = chunk.type === 'sine' ? 0.15 : 0.2 // Sine waves (numbers) get sharper attack
+      const attackRatio = chunk.type === 'sine' ? 0.15 : 0.2
       const attackTime = Math.min(0.01, duration * attackRatio)
-
-      // Release time varies by magnitude - higher magnitude = longer tail
       const releaseRatio = Math.min(0.3, 0.2 + chunk.magnitude * 0.1)
       const releaseTime = Math.min(0.08, duration * releaseRatio)
-
       const sustainDuration = Math.max(0, duration - attackTime - releaseTime)
 
-      // Apply different envelope shapes based on duration and chunk properties
       if (duration > 0.02) {
-        // For longer sounds, use exponential ramps for more natural sound
-        // The magnitude directly affects the volume
         gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, now + attackTime)
-
-        // For high-frequency sounds (deep in object hierarchy), add slight decay
         if (chunk.frequency > AUDIO_CONFIG.BASE_FREQUENCY * 2) {
           const decayTarget = chunk.magnitude * 0.85
           gainNode.gain.exponentialRampToValueAtTime(
@@ -244,8 +236,6 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
             now + attackTime + sustainDuration * 0.2
           )
           gainNode.gain.setValueAtTime(decayTarget, now + attackTime + sustainDuration * 0.2)
-
-          // Add filter sweep for high frequency sounds
           if (filterNode.frequency.value > 0) {
             filterNode.frequency.exponentialRampToValueAtTime(
               filterNode.frequency.value * 0.7,
@@ -254,8 +244,6 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
           }
         } else if (sustainDuration > 0.001) {
           gainNode.gain.setValueAtTime(chunk.magnitude, now + attackTime + sustainDuration)
-
-          // Add subtle filter movement for interest
           if (filterNode.frequency.value > 0) {
             filterNode.frequency.exponentialRampToValueAtTime(
               filterNode.frequency.value * 1.2,
@@ -267,16 +255,10 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
             )
           }
         }
-
-        // Final release
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
       } else {
-        // For very short sounds, use simpler linear ramps
-        // Peak volume is proportional to the magnitude
         gainNode.gain.linearRampToValueAtTime(chunk.magnitude, now + duration * 0.5)
         gainNode.gain.linearRampToValueAtTime(0, now + duration)
-
-        // Quick filter sweep for percussive effect on short sounds
         if (filterNode.frequency.value > 0) {
           filterNode.frequency.exponentialRampToValueAtTime(
             filterNode.frequency.value * 0.5,
@@ -285,14 +267,11 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
         }
       }
 
-      // Start and schedule stop of the oscillator
       oscillator.start(now)
       oscillator.stop(now + duration)
 
-      // Cleanup promise with timeout safety
       await new Promise<void>(resolve => {
         let resolved = false
-        // Timeout based on actual duration plus buffer
         const timeoutId = setTimeout(
           () => {
             if (!resolved) {
@@ -309,9 +288,8 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
               resolve()
             }
           },
-          duration * 1000 + 150
+          chunk.duration + 150 // Use chunk.duration (ms) here, not seconds
         )
-
         oscillator.onended = () => {
           if (!resolved) {
             clearTimeout(timeoutId)
@@ -328,14 +306,13 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
           }
         }
       })
-      return true // Audio playback initiated
+      return true
     }
-
-    return false // Audio did not play
+    return false
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`Failed to prepare audio for chunk ${chunk.id}:`, message)
-    return false // Indicate audio setup/playback failed
+    return false
   }
 }
 
@@ -349,9 +326,10 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 export function sonifyChanges<T extends DiffChunk>(diff: T, duration: number): void {
   try {
     const sonicChunk = diffToSonic(diff, duration)
-    console.log('sonicChunk', sonicChunk)
+    // console.log('sonicChunk from sonifyChanges:', sonicChunk) // Keep for debugging if needed
 
-    // Stagger playback
+    // Stagger playback slightly if multiple changes occur rapidly, though currently called per diffChunk
+    // setTimeout is 0, so it's more about deferring to next tick.
     setTimeout(() => {
       playSonicChunk(sonicChunk).catch(err => {
         console.error(`Error during scheduled playback for chunk ${sonicChunk.id}:`, err)

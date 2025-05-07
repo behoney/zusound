@@ -1,45 +1,25 @@
 export const SONIC_CHUNK_EVENT_NAME = '__ZUSOUND_SONIC_CHUNK__'
-/**
- * Represents a single sonic event (sound) that will be played
- * based on a state change in the application
- */
+/** Sound event triggered by state changes */
 export type SonicChunk = {
-  /**
-   * Unique identifier for this chunk, typically the key path of the changed state
-   */
+  /** Unique ID, usually the changed state's key path */
   id: string
 
-  /**
-   * Waveform type that determines the timbre of the sound
-   * - sine: smooth, pure tone (used for numbers by default)
-   * - square: harsh, electronic sound (used for strings by default)
-   * - sawtooth: bright, buzzy sound (used for booleans by default)
-   * - triangle: softer, hollow sound (used for objects and removals by default)
-   */
+  /** Sound waveform type
+   * - sine: pure tone (numbers)
+   * - square: electronic (strings)
+   * - sawtooth: buzzy (booleans)
+   * - triangle: hollow (objects/removals) */
   type: 'sine' | 'square' | 'sawtooth' | 'triangle' | 'custom'
 
-  /**
-   * Base frequency of the sound in Hertz (Hz)
-   * Typically ranges from 110Hz to 880Hz in the current implementation
-   */
+  /** Base frequency in Hz (110-880Hz) */
   frequency: number
 
-  /**
-   * Volume/amplitude of the sound (0.0 to 1.0)
-   * Default: 0.5 for changes, 0.3 for removals
-   */
+  /** Volume (0-1), 0.5 for changes, 0.3 for removals */
   magnitude: number
 
-  /**
-   * Duration of the sound in milliseconds
-   * Minimum value is typically 50ms
-   */
+  /** Duration in ms (min 50ms) */
   duration: number
 
-  /**
-   * Fine pitch adjustment in cents (1/100 of a semitone)
-   * Used to create subtle variations based on value types and magnitudes
-   * Range: -600 to 600 cents in current implementation
-   */
+  /** Pitch adjustment in cents (-600 to 600) */
   detune: number
 }

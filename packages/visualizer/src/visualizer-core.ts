@@ -1,7 +1,7 @@
-import type { SonicChunk } from '../../shared-types'
-import type { ZusoundEvent } from '../types'
+import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../../shared-types/sonic-chunk'
 import { VisualizerShaderManager } from './shader-manager'
 import { EVENT_LIFETIME_MS, MAX_VISIBLE_EVENTS, VISUALIZER_SIZE } from './config'
+import { isSonificationEvent, ZusoundSoundEvent } from '../../shared-types'
 
 /** Interface for the visualizer events queued for rendering */
 export interface VisualizerEvent {
@@ -165,30 +165,26 @@ export class Visualizer {
     }
   }
 
-  /** Handles incoming 'zusound' custom events from the window. */
-  private handleSonificationEvent = (event: Event) => {
+  /** Handles incoming sonic chunk custom events from the window. */
+  private handleSonificationEvent = (event: ZusoundSoundEvent) => {
     // Type guard to ensure it's the correct event structure
-    if (this.isZusoundEvent(event) && event.detail?.chunk) {
+    if (isSonificationEvent(event) && event.detail?.chunk) {
       this.addEvent(event.detail.chunk)
     }
-  }
-
-  // Type guard for ZusoundEvent
-  private isZusoundEvent(event: Event): event is ZusoundEvent {
-    return event instanceof CustomEvent && event.type === 'zusound' && 'detail' in event
   }
 
   /** Attaches the event listener to the window if not already attached. */
   private attachEventListener(): void {
     if (this.eventListenerAttached || typeof window === 'undefined') return
-    window.addEventListener('zusound', this.handleSonificationEvent)
+    // Listen to the specific SONIC_CHUNK_EVENT_NAME
+    window.addEventListener(SONIC_CHUNK_EVENT_NAME, this.handleSonificationEvent)
     this.eventListenerAttached = true
   }
 
   /** Detaches the event listener from the window. */
   private detachEventListener(): void {
     if (!this.eventListenerAttached || typeof window === 'undefined') return
-    window.removeEventListener('zusound', this.handleSonificationEvent)
+    window.removeEventListener(SONIC_CHUNK_EVENT_NAME, this.handleSonificationEvent)
     this.eventListenerAttached = false
   }
 
@@ -203,6 +199,6 @@ export class Visualizer {
     this.events = [] // Clear event queue
 
     // Optionally reset the static instance if full re-initialization is needed
-    // Visualizer.instance = null;
+    Visualizer.instance = null
   }
 }
