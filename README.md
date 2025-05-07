@@ -251,37 +251,79 @@ zusound is inspired by the excellent [Zustand](https://github.com/pmndrs/zustand
 
 ---
 
-Component interfaces:
+## ⚙️ How zusound Works: Core Components
 
-1. diff : (prevState: any, nextState: any) => diffChunk
+zusound operates through a pipeline of distinct components, each with a specific role in transforming state changes into sound and visuals. Here's a breakdown:
 
-- get prevState and nextState
-- return diffChunk
+1.  **Middleware (`zusound`)**
+    *   **File:** `packages/middleware/zusound.ts`
+    *   **Interface:** `zusound(initializer: StateCreator, options?: ZusoundOptions) => StateCreator`
+    *   **Functionality:**
+        *   Integrates with your Zustand store.
+        *   Subscribes to state changes.
+        *   When a change occurs, it passes the `currentState` and `prevState` to the `Core Logic` component.
 
-2. core aka trace : (newState: T) => SonicChunk
+2.  **Core Logic (`coreImpl`)**
+    *   **File:** `packages/core/index.ts`
+    *   **Interface:** `coreImpl(currentState, prevState, options) => void`
+    *   **Functionality:**
+        *   Iterates over the properties of the state.
+        *   For each property that has changed:
+            1.  Calls the `Diff Engine` to calculate a `DiffChunk`.
+            2.  Dispatches a `__ZUSOUND_DIFF_CHUNK__` CustomEvent containing the `DiffChunk`. This event (defined in `packages/shared-types/diff-chunk.ts`) can be used by external tools for advanced logging or custom visualizations.
+            3.  Invokes the `Sonification Engine`'s `sonifyChanges` function with the `DiffChunk` to generate and play sound. This process also leads to the dispatch of a `__ZUSOUND_SONIC_CHUNK__` event (see Sonification Engine below).
+            4.  The `Core Logic` component also *directly* converts the `DiffChunk` to a `SonicChunk` instance and dispatches another `__ZUSOUND_SONIC_CHUNK__` CustomEvent.
+                *   *Note for v0.1.3:* This means the `__ZUSOUND_SONIC_CHUNK__` event is typically dispatched twice for each state change – once by the Sonification Engine during sound playback, and once directly by `coreImpl`. The Visualizer will react to both.
 
-- get newState
-- restore prevState
-- call diff
-  - get diffChunk return
-  - dispatch DiffChunk event
-  - generate SonicChunk
-  - dispatch SonicChunk event
+3.  **Diff Engine (`diff`)**
+    *   **File:** `packages/diff/diff.ts`
+    *   **Interface:** `diff(path: string, nextState: T, prevState: T) => DiffChunk`
+    *   **Functionality:**
+        *   Receives the path (key) of the changed state property, along with its previous and next values.
+        *   Computes the difference and characteristics of the change.
+        *   **Output (`DiffChunk`):** An object describing the change, as defined in `packages/shared-types/diff-chunk.ts`. Example structure:
+            ```typescript
+            // Example DiffChunk structure
+            // From: packages/shared-types/diff-chunk.ts
+            type DiffChunk = {
+              id: string;          // Stringified next value for identity/debugging
+              path: string;        // Key/path of changed state
+              type: 'add' | 'remove' | 'change'; // Based on diffPower
+              valueType: 'number' | 'string' | 'boolean' | 'object' | 'array' | 'unknown'; // Type of the changed value
+              diff: string;        // Stringified diff metric (e.g., Levenshtein distance or length)
+              diffPower: number;   // Algorithm-determined value indicating magnitude/direction of change
+            };
+            ```
 
-3. middleware : (zustandStore) => zustandStore
+4.  **Sonification Engine**
+    *   **Files:** `packages/sonification/sonification.ts`, `packages/shared-types/sonic-chunk.ts`
+    *   **Key Functions & Workflow:**
+        *   `sonifyChanges(diffChunk: DiffChunk, duration: number): void`:
+            1.  Calls `diffToSonic(diffChunk, duration)` to convert the `DiffChunk` into sound parameters (`SonicChunk`).
+            2.  Schedules `playSonicChunk(sonicChunk)` for execution.
+        *   `diffToSonic(diffChunk: DiffChunk, duration: number): SonicChunk`:
+            *   Translates properties of a `DiffChunk` (like `type`, `valueType`, `diffPower`) into acoustic parameters.
+            *   **Output (`SonicChunk`):** An object defining the sound to be played, as defined in `packages/shared-types/sonic-chunk.ts`. Example structure:
+                ```typescript
+                // Example SonicChunk structure
+                // From: packages/shared-types/sonic-chunk.ts
+                type SonicChunk = {
+                  id: string;          // Unique ID, usually the changed state's key path
+                  type: 'sine' | 'square' | 'sawtooth' | 'triangle' | 'custom'; // Waveform type
+                  frequency: number;   // Base frequency in Hz
+                  magnitude: number;   // Volume (0-1)
+                  duration: number;    // Duration in ms
+                  detune: number;      // Pitch adjustment in cents
+                };
+                ```
+        *   `playSonicChunk(sonicChunk: SonicChunk): Promise<boolean>`:
+            1.  Dispatches a `__ZUSOUND_SONIC_CHUNK__` CustomEvent (defined in `packages/shared-types/sonic-chunk.ts`) containing the `SonicChunk`. This event is crucial for the `Visualizer`.
+            2.  Uses the Web Audio API to synthesize and play the sound described by the `SonicChunk`.
 
-- get zustand store
-  - call core
-    - get SonicChunk
-    - dispatch SonicChunk event
-- return zustand store ( actually doing nothing )
-
-4. sonification : (SonicChunk: string) => void
-
-- listen to SonicChunk Event
-- play SonicChunk (void)
-
-5. (WIP) visualizer: (DiffChunk: string) => void
-
-- listen to DiffChunk Event
-- display DiffChunk (void)
+5.  **Visualizer** (WIP)
+    *   **Files:** `packages/visualizer/index.ts`, `packages/visualizer/src/visualizer-core.ts`
+    *   **Functionality:**
+        *   Provides an optional visual feedback mechanism for the generated sounds.
+        *   Listens for `__ZUSOUND_SONIC_CHUNK__` CustomEvents dispatched by the Sonification Engine (and also directly by the Core Logic).
+        *   When an event is caught, the `SonicChunk` data (from `event.detail.chunk`) is used to render a visual effect (e.g., an expanding ring, color changes) on a canvas element using WebGL.
+        *   The visualizer UI (a small, circular canvas) can be shown persistently or within a dialog if audio playback is initially blocked by browser autoplay policies. Helper functions like `showPersistentVisualizer()` control its visibility.
