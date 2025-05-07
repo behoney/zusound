@@ -30,3 +30,5 @@ export const isDiffEvent = (event: Event): event is ZusoundDiffEvent => {
 
 export type { SonicChunk } from './sonic-chunk.ts'
 export type { DiffChunk } from './diff-chunk.ts'
+
+export { SONIC_CHUNK_EVENT_NAME, DIFF_CHUNK_EVENT_NAME }

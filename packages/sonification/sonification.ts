@@ -1,7 +1,6 @@
-import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../shared-types/sonic-chunk' // Ensure SONIC_CHUNK_EVENT_NAME is imported
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager } from './utils'
-import { DiffChunk, ZusoundSoundEvent } from '../shared-types'
+import { SONIC_CHUNK_EVENT_NAME, SonicChunk, DiffChunk, ZusoundSoundEvent } from '../shared-types'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds

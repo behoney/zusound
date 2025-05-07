@@ -1,7 +1,11 @@
-import { SONIC_CHUNK_EVENT_NAME, SonicChunk } from '../../shared-types/sonic-chunk'
+import {
+  isSonificationEvent,
+  ZusoundSoundEvent,
+  SONIC_CHUNK_EVENT_NAME,
+  SonicChunk,
+} from '../../shared-types'
 import { VisualizerShaderManager } from './shader-manager'
 import { EVENT_LIFETIME_MS, MAX_VISIBLE_EVENTS, VISUALIZER_SIZE } from './config'
-import { isSonificationEvent, ZusoundSoundEvent } from '../../shared-types'
 
 /** Interface for the visualizer events queued for rendering */
 export interface VisualizerEvent {

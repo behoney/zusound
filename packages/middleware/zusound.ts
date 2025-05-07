@@ -1,7 +1,6 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 import coreImpl, { CoreOptions } from '../core'
-import { DIFF_CHUNK_EVENT_NAME } from '../shared-types/diff-chunk'
-import { ZusoundDiffEvent } from '../shared-types'
+import { DIFF_CHUNK_EVENT_NAME, ZusoundDiffEvent } from '../shared-types'
 
 type Cast<T, U> = T extends U ? T : U
 type Write<T, U> = Omit<T, keyof U> & U
