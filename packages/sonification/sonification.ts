@@ -316,11 +316,10 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 }
 
 /**
- * Generates sonic chunks and plays them.
- * Visualizer listens independently via dispatched events.
- * @param diff - State changes
- * @param duration - Sound duration
- * @param _persistVisualizer - No longer used for UI control, kept for potential future options
+ * Converts state changes into sound and triggers playback.
+ * The visualizer component receives these events through the window event system.
+ * @param diff - The state change to sonify
+ * @param duration - Duration of the sound in milliseconds
  */
 export function sonifyChanges<T extends DiffChunk>(diff: T, duration: number): void {
   try {
