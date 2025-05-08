@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { create } from 'zustand'
 import { zusound, showPersistentVisualizer, hidePersistentVisualizer } from '../../packages'
-import { CodeViewer } from '../CodeViewer'
-import visualizerExampleSource from './VisualizerExample.tsx?raw'
+import { CodeViewer } from '../code-viewer'
+import visualizerExampleSource from './visualizer-example.tsx?raw'
 
 // --- Zustand Store ---
 interface CounterState {

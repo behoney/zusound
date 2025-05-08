@@ -1,12 +1,12 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { TodoApp } from './todo-app/Todo'
-import BasicUsage from './basic-usage/BasicUsage'
-import { ExampleIndex } from './ExampleIndex'
+import { TodoApp } from './todo-app/todo-example'
+import BasicUsage from './basic-example/basic-example'
+import { ExampleIndex } from './example-index'
 import { RouterProvider, Routes, Route } from './router'
-import { Header } from './Header'
-import Middlewares from './middlewares/Middlewares'
-import VisualizerExample from './visualizer-example/VisualizerExample'
+import { Header } from './header_'
+import Middlewares from './middlewares/middlewares-example'
+import VisualizerExample from './visualizer-example/visualizer-example'
 
 // Create App container component with the header and main content area
 function App() {

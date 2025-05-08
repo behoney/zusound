@@ -10,7 +10,6 @@
     "isolatedModules": true,
     "declaration": true,
     "declarationDir": "./dist",
-    "emitDeclarationOnly": true,
     "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": false,
@@ -19,8 +18,9 @@
     "noUncheckedSideEffectImports": true,
     "noImplicitAny": false,
     "outDir": "./dist",
+    "rootDir": "packages",
     "paths": {
-      "zusound": ["./packages/index"]
+      "*": ["./*"]
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],

@@ -248,6 +248,7 @@ export class VisualizerShaderManager {
       square: 1,
       sawtooth: 2,
       triangle: 3,
+      custom: 3,
     }
 
     for (let i = 0; i < MAX_VISIBLE_EVENTS; i++) {

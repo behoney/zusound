@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react'
 import { create } from 'zustand'
 import { zusound } from '../../packages' // Adjust the import path if necessary
-import { CodeViewer } from '../CodeViewer' // Import the CodeViewer
-import todoSource from './Todo.tsx?raw' // Import raw source code
+import { CodeViewer } from '../code-viewer' // Import the CodeViewer
+import todoSource from './todo-example.tsx?raw' // Import raw source code
 
 // --- Types ---
 interface Todo {
