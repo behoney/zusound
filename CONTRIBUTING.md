@@ -180,8 +180,7 @@ zusound operates through a pipeline of distinct components, each with a specific
       - For each property that has changed:
         1.  Calls the `Diff Engine` to calculate a `DiffChunk`.
         2.  Dispatches a `__ZUSOUND_DIFF_CHUNK__` CustomEvent containing the `DiffChunk`. This event (defined in `packages/shared-types/diff-chunk.ts`) can be used by external tools for advanced logging or custom visualizations.
-        3.  Invokes the `Sonification Engine`'s `sonifyChanges` function with the `DiffChunk` to generate and play sound. This process also leads to the dispatch of a `__ZUSOUND_SONIC_CHUNK__` event (see Sonification Engine below).
-        4.  The `Core Logic` component also _directly_ converts the `DiffChunk` to a `SonicChunk` instance and dispatches another `__ZUSOUND_SONIC_CHUNK__` CustomEvent.
+        3.  Invokes the `Sonification Engine`'s `sonifyChanges` function with the `DiffChunk`. This function is responsible for converting the `DiffChunk` to a `SonicChunk`, generating and playing the sound, and dispatching a `__ZUSOUND_SONIC_CHUNK__` event for visualizers (see Sonification Engine below).
 
 3.  **Diff Engine (`diff`)**
 
@@ -234,6 +233,6 @@ zusound operates through a pipeline of distinct components, each with a specific
     - **Files:** `packages/visualizer/index.ts`, `packages/visualizer/src/visualizer-core.ts`
     - **Functionality:**
       - Provides an optional visual feedback mechanism for the generated sounds.
-      - Listens for `__ZUSOUND_SONIC_CHUNK__` CustomEvents dispatched by the Sonification Engine (and also directly by the Core Logic).
+      - Listens for `__ZUSOUND_SONIC_CHUNK__` CustomEvents dispatched by the Sonification Engine (specifically, from the `playSonicChunk` function as part of the sound generation process).
       - When an event is caught, the `SonicChunk` data (from `event.detail.chunk`) is used to render a visual effect (e.g., an expanding ring, color changes) on a canvas element using WebGL.
       - The visualizer UI (a small, circular canvas) can be shown persistently or within a dialog if audio playback is initially blocked by browser autoplay policies. Helper functions like `showPersistentVisualizer()` control its visibility.
