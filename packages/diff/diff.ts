@@ -1,122 +1,81 @@
-/**
- * --- Diff Calculation ---
- *
- * This module provides utilities for calculating differences between state objects.
- * The diff results are used by the sonification module to create sound representations
- * of state changes, where different types of changes (additions, removals, modifications)
- * are mapped to different sound characteristics.
- *
- * The calculated diffs help determine:
- * - Which properties changed (mapped to different frequencies)
- * - How values changed (affecting sound detune)
- * - Types of changes (mapped to different waveforms)
- */
-import { shallow } from 'zustand/shallow'
-import { ChangeType, DetailedDiff, DiffOptions } from './types'
+import { DiffChunk } from '../shared-types'
+import { distance } from 'fastest-levenshtein'
+import { getDiffType, getValueType } from './utils'
 
-/**
- * Default options for diff calculation
- */
-const DEFAULT_OPTIONS: DiffOptions = {
-  detailed: false,
-  trackAdded: true,
-  trackRemoved: true,
-}
+type DiffableType =
+  | string
+  | number
+  | boolean
+  | Record<string, unknown>
+  | Array<unknown>
+  | undefined
+  | null
 
-/**
- * Calculates the difference between two states
- *
- * @param prevState - The previous state object
- * @param nextState - The next state object
- * @param options - Configuration options for the diff calculation
- * @returns A partial object containing only the changed properties
- */
-export function calculateDiffBase<T>(
-  prevState: T,
+const diffFunc = <T extends DiffableType>(
   nextState: T,
-  options: DiffOptions = DEFAULT_OPTIONS
-): Partial<T> | DetailedDiff<T> {
-  // Return empty object if states are identical
-  if (prevState === nextState) {
-    return {}
-  }
+  prevState: T
+): Pick<DiffChunk, 'diff' | 'diffPower'> => {
+  let _diff: string, _diffPower: number
 
-  // Handle non-object or null cases
-  if (
-    typeof prevState !== 'object' ||
-    prevState === null ||
-    typeof nextState !== 'object' ||
-    nextState === null
-  ) {
-    return options.detailed
-      ? ({ value: nextState, type: prevState === undefined ? 'add' : 'change' } as DetailedDiff<T>)
-      : (nextState as Partial<T>)
-  }
+  if (prevState === undefined || prevState === null) {
+    _diff = JSON.stringify(nextState).length.toString()
+    _diffPower = 1
+  } else if (nextState === undefined || nextState === null) {
+    _diff = JSON.stringify(prevState).length.toString()
+    _diffPower = -1
+  } else {
+    const steps = distance(JSON.stringify(prevState), JSON.stringify(nextState))
+    _diff = steps.toString()
 
-  // Create set of all keys from both objects
-  const allKeys = new Set([
-    ...Object.keys(prevState as Record<string, unknown>),
-    ...Object.keys(nextState as Record<string, unknown>),
-  ])
-
-  // Initialize diff object
-  const diff = {} as Record<string, unknown>
-
-  // Iterate through all keys
-  for (const key of allKeys) {
-    const prevValue = (prevState as Record<string, unknown>)[key]
-    const nextValue = (nextState as Record<string, unknown>)[key]
-    let changeType: ChangeType | null = null
-
-    // Determine change type
-    if (!(key in (prevState as object)) && key in (nextState as object) && options.trackAdded) {
-      changeType = 'add'
-    } else if (
-      key in (prevState as object) &&
-      !(key in (nextState as object)) &&
-      options.trackRemoved
-    ) {
-      changeType = 'remove'
-    } else if (!shallow(prevValue, nextValue)) {
-      changeType = 'change'
-    }
-
-    // If a change was detected
-    if (changeType !== null) {
-      if (options.detailed) {
-        diff[key] = {
-          value: nextValue,
-          previousValue: changeType !== 'add' ? prevValue : undefined,
-          type: changeType,
-        }
-      } else {
-        diff[key] = nextValue
-      }
+    switch (typeof nextState) {
+      case 'number':
+        _diffPower = Number(nextState) - Number(prevState)
+        break
+      case 'boolean':
+        _diffPower = nextState === prevState ? 0 : nextState ? 1 : -1
+        break
+      case 'string':
+      case 'object':
+      case 'undefined':
+      default:
+        _diffPower =
+          1 -
+          steps / Math.max(1, JSON.stringify(prevState).length, JSON.stringify(nextState).length)
+        break
     }
   }
 
-  return diff as Partial<T> | DetailedDiff<T>
+  return {
+    diff: String(_diff),
+    diffPower: _diffPower,
+  }
 }
 
-/**
- * Simplified version of calculateDiffBase that only returns changed values
- * without detailed change information
- *
- * @param prevState - The previous state object
- * @param nextState - The next state object
- * @returns A partial object containing only the changed properties
- */
-export function calculateSimpleDiff<T>(prevState: T, nextState: T): Partial<T> {
-  return calculateDiffBase(prevState, nextState, { detailed: false }) as Partial<T>
+export const diffImpl = <T extends DiffableType>(
+  path: string,
+  nextState: T,
+  prevState: T
+): DiffChunk => {
+  const { diff, diffPower } = diffFunc(prevState, nextState)
+
+  const diffChunk: DiffChunk = {
+    id: JSON.stringify(nextState),
+    path,
+    type: getDiffType(diffPower),
+    valueType: getValueType(nextState),
+    diff,
+    diffPower,
+  }
+
+  return diffChunk
 }
 
-/**
- * Version of calculateDiffBase that includes detailed change information
- *
- * @param prevState - The previous state object
- * @param nextState - The next state object
- * @returns A detailed diff object with change type information
- */
-export function calculateDetailedDiff<T>(prevState: T, nextState: T): DetailedDiff<T> {
-  return calculateDiffBase(prevState, nextState, { detailed: true }) as DetailedDiff<T>
+export const isDiffable = (value: unknown): value is DiffableType => {
+  return (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'object' ||
+    Array.isArray(value)
+  )
 }

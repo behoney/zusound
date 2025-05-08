@@ -19,7 +19,7 @@ interface AnotherState {
   updateTexts: (str: string) => void
 }
 
-const useCountStore = create<CountState>()(
+const useCountStore = create<CountState>(
   zusound(set => ({
     count: 0,
     increment: () => set(state => ({ count: state.count + 1 })),
@@ -46,8 +46,7 @@ const useAnotherStore = create<AnotherState>()(
       updateTexts: (str: string) => set({ anotherText: str }), // Simplified update
     }),
     {
-      logDiffs: true, // Enable logging for this store
-      name: 'AnotherStore', // Add name
+      enabled: true,
     }
   )
 )
