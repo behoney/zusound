@@ -1,6 +1,6 @@
 {
   "name": "zusound",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Sound feedback middleware for Zustand state management",
   "type": "module",
   "main": "./dist/index.umd.js",
@@ -50,7 +50,6 @@
   "bugs": {
     "url": "https://github.com/behoney/zusound/issues"
   },
-  "npm": "https://www.npmjs.com/package/zusound",
   "dependencies": {
     "fastest-levenshtein": "^1.0.16",
     "zustand": ">=5.0.0"
