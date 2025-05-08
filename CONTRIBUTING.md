@@ -182,7 +182,6 @@ zusound operates through a pipeline of distinct components, each with a specific
         2.  Dispatches a `__ZUSOUND_DIFF_CHUNK__` CustomEvent containing the `DiffChunk`. This event (defined in `packages/shared-types/diff-chunk.ts`) can be used by external tools for advanced logging or custom visualizations.
         3.  Invokes the `Sonification Engine`'s `sonifyChanges` function with the `DiffChunk` to generate and play sound. This process also leads to the dispatch of a `__ZUSOUND_SONIC_CHUNK__` event (see Sonification Engine below).
         4.  The `Core Logic` component also _directly_ converts the `DiffChunk` to a `SonicChunk` instance and dispatches another `__ZUSOUND_SONIC_CHUNK__` CustomEvent.
-            - _Note for v0.1.3:_ This means the `__ZUSOUND_SONIC_CHUNK__` event is typically dispatched twice for each state change – once by the Sonification Engine during sound playback, and once directly by `coreImpl`. The Visualizer will react to both.
 
 3.  **Diff Engine (`diff`)**
 
