@@ -13,7 +13,7 @@ import VisualizerExample from './visualizer-example/visualizer-example'
 function App() {
   useEffect(() => {
     // Initialize Clarity
-    Clarity.init('rhs81v7l08')
+    Clarity.init(import.meta.env.VITE_CLARITY_PROJECT_ID)
   }, [])
 
   return (
