@@ -20,10 +20,13 @@ interface AnotherState {
 }
 
 const useCountStore = create<CountState>(
-  zusound(set => ({
-    count: 0,
-    increment: () => set(state => ({ count: state.count + 1 })),
-  }))
+  zusound(
+    set => ({
+      count: 0,
+      increment: () => set(state => ({ count: state.count + 1 })),
+    }),
+    { enabled: true }
+  )
 )
 
 const useAnotherStore = create<AnotherState>()(
