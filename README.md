@@ -1,6 +1,6 @@
 # ✨ zusound: Hear Your State Changes! ✨
 
-[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![Version](https://img.shields.io/badge/version-0.1.5-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
 [![npm version](https://img.shields.io/npm/v/zusound?style=flat-square)](https://www.npmjs.com/package/zusound)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub Pages Deploy](https://img.shields.io/github/deployments/behoney/zusound/github-pages?label=Examples%20Deploy&style=flat-square&logo=github)](https://behoney.github.io/zusound/)
