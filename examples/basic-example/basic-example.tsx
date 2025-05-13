@@ -68,8 +68,7 @@ function BasicUsage() {
         This example demonstrates the fundamental integration of `zusound` with two simple Zustand
         stores. Interact with the buttons and input fields. Each state change (incrementing a count,
         updating text, toggling a boolean, adding an object property) will trigger the `zusound`
-        middleware, producing distinct audible feedback based on the nature of the change. The
-        second store also demonstrates the `logDiffs` option.
+        middleware, producing distinct audible feedback based on the nature of the change.
       </p>
 
       {/* Counter Store Section */}
