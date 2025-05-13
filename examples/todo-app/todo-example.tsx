@@ -382,8 +382,7 @@ export function TodoApp() {
         `Filter`, `Input`, `Time`) interacting. Listen for distinct sounds when adding, toggling,
         deleting todos (array modifications), changing filters (simple value change), typing in the
         input, or when the time updates (unrelated store). The visual sort function demonstrates how
-        rapid, successive state updates sound. The `logDiffs` option is enabled for the main
-        `TodoStore`.
+        rapid, successive state updates sound.
       </p>
       <TimeDisplay />
       <AddTodoForm />
