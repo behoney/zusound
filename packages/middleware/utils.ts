@@ -1,4 +1,4 @@
-export const isProduction = (): boolean => {
+const getIsProduction = (): boolean => {
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') {
     return true
   }
@@ -11,3 +11,5 @@ export const isProduction = (): boolean => {
 
   return false
 }
+
+export const isProduction = getIsProduction()
