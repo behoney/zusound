@@ -1,6 +1,11 @@
 # ✨ zusound: Hear Your State Changes! ✨
 
-[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![Version](https://img.shields.io/badge/version-0.1.5-blue.svg)](https://github.com/behoney/zusound) <!-- Placeholder: update when published -->
+[![npm version](https://img.shields.io/npm/v/zusound?style=flat-square)](https://www.npmjs.com/package/zusound)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![GitHub Pages Deploy](https://img.shields.io/github/deployments/behoney/zusound/github-pages?label=Examples%20Deploy&style=flat-square&logo=github)](https://behoney.github.io/zusound/)
+
+🚀 [Live Examples](https://behoney.github.io/zusound/) & [Demo](https://stackblitz.com/edit/zusound-example?file=src%2FCounter.tsx) are available!
 
 Ever wondered what your application's state _sounds_ like? zusound is a lightweight Zustand middleware that transforms state changes into an auditory experience. Get real-time, sonic feedback on how your application behaves, making debugging more intuitive and maybe even... fun?
 
@@ -10,7 +15,6 @@ Built with the Web Audio API, zusound analyzes state transitions and generates c
 
 - **Intuitive Debugging:** Gain a different perspective on state updates. Hear subtle changes or complex transitions instantly.
 - **Engaging Development:** Add a bit of auditory flair to your workflow. "Delightful" sounds for minor updates, distinct "alerts" for significant changes.
-- **Novelty:** Explore a unique approach to developer tooling.
 
 ## 🚀 Installation
 
@@ -74,93 +78,6 @@ function Counter() {
     </div>
   )
 }
-```
-
-### With Configuration
-
-```typescript
-import { create } from 'zustand'
-import { zusound } from 'zusound'
-
-// Create a store with zusound middleware and custom options
-const useStore = create<RandomType>()(
-  zusound(
-    set => ({
-      count: 0,
-      increment: () => set(state => ({ count: state.count + 1 })),
-      decrement: () => set(state => ({ count: state.count - 1 })),
-    }),
-    {
-      enabled: true, // Enable/disable sounds (default: true in dev, auto-disabled in production)
-      // below is not supported yet
-      // logDiffs: false, // Log state diffs to console (default: false)
-      // allowInProduction: false, // Allow zusound to work in production (default: false)
-      // name: 'CounterStore', // Name for the store (optional)
-    }
-  )
-)
-```
-
-### Production Usage
-
-By default, zusound is disabled in production environments to avoid unnecessary overhead in your released application. This behavior ensures that your development tools don't affect end-user experience.
-
-The middleware automatically detects production environments by checking:
-
-- `process.env.NODE_ENV === 'production'` (Node.js / React)
-- `import.meta.env.PROD === true` (Vite)
-
-If you need to enable zusound in production (for example, in a demo app), you can set the `allowInProduction` option to `true`:
-
-```typescript
-const useStore = create<RandomType>()(
-  zusound(
-    // Your store initializer...
-    {
-      // below is not supported yet
-      // allowInProduction: true, // Force zusound to work even in production
-    }
-  )
-)
-```
-
-## 🔍 Example
-
-Here's a complete example showing zusound in action:
-
-```typescript
-import React from 'react'
-import { create } from 'zustand'
-import { zusound } from 'zusound'
-
-// Create store with zusound middleware
-const useCounterStore = create<RandomType>()(
-  zusound(set => ({
-    count: 0,
-    increment: () => set(state => ({ count: state.count + 1 })),
-    decrement: () => set(state => ({ count: state.count - 1 })),
-    reset: () => set({ count: 0 }),
-  }))
-)
-
-// Simple counter component
-function Counter() {
-  const { count, increment, decrement, reset } = useCounterStore()
-
-  return (
-    <div>
-      <h1>Counter: {count}</h1>
-      <div>
-        <button onClick={increment}>+</button>
-        <button onClick={decrement}>-</button>
-        <button onClick={reset}>Reset</button>
-      </div>
-      <p>Listen for sounds as you interact with the counter!</p>
-    </div>
-  )
-}
-
-export default Counter
 ```
 
 ## 💡 Core Concepts
