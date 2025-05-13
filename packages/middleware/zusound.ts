@@ -15,7 +15,7 @@ export function zusound<T, U extends any[], V extends any[]>(
     const { enabled, ...opts } = options
     const initialState = initializer(set, get, api)
 
-    if (enabled && !isProduction) {
+    if (enabled || !isProduction) {
       api.subscribe((state, prevState) => coreImpl(state, prevState, opts))
       if (typeof window !== 'undefined' && !(DIFF_CHUNK_EVENT_NAME in window)) {
         window[DIFF_CHUNK_EVENT_NAME] = true

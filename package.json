@@ -1,6 +1,6 @@
 {
   "name": "zusound",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Sound feedback middleware for Zustand state management",
   "type": "module",
   "main": "./dist/index.umd.js",
