@@ -14,12 +14,15 @@ interface CounterState {
 
 // Create a store with zusound middleware
 const useCounterStore = create<CounterState>()(
-  zusound(set => ({
-    count: 0,
-    increment: () => set(state => ({ count: state.count + 1 })),
-    decrement: () => set(state => ({ count: state.count - 1 })),
-    reset: () => set({ count: 0 }),
-  }))
+  zusound(
+    set => ({
+      count: 0,
+      increment: () => set(state => ({ count: state.count + 1 })),
+      decrement: () => set(state => ({ count: state.count - 1 })),
+      reset: () => set({ count: 0 }),
+    }),
+    { enabled: true }
+  )
 )
 
 // Example demonstrating control of the persistent visualizer UI

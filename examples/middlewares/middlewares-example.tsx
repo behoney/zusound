@@ -76,7 +76,8 @@ const useImmerCounterStore = create<CounterState>()(
         set(state => {
           state.count = 0
         }),
-    }))
+    })),
+    { enabled: true }
   )
 )
 
@@ -95,7 +96,8 @@ const usePersistCounterStore = create<CounterState>()(
       {
         name: 'persist-counter-storage', // Unique name for storage
       }
-    )
+    ),
+    { enabled: true }
   )
 )
 
@@ -112,7 +114,8 @@ const useDevtoolsCounterStore = create<CounterState>()(
         reset: () => set(() => ({ count: 0 }), false, 'RESET'),
       }),
       { name: 'DevtoolsCounterStore' } // Name for devtools extension
-    )
+    ),
+    { enabled: true }
   )
 )
 
@@ -146,7 +149,8 @@ const useMixedCounterStore = create<CounterState>()(
         }
       ),
       { name: 'MixedCounterStoreDevtools' } // Name for devtools extension
-    )
+    ),
+    { enabled: true }
   )
 )
 
