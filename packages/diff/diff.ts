@@ -10,6 +10,7 @@ type DiffableType =
   | Array<unknown>
   | undefined
   | null
+  | unknown
 
 const diffFunc = <T extends DiffableType>(
   nextState: T,

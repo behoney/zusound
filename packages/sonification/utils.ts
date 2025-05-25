@@ -109,7 +109,7 @@ export class AudioContextManager {
 
     // Only proceed if suspended
     if (this.audioContext.state === 'suspended') {
-      console.log('Attempting to resume suspended AudioContext...')
+      console.info('Attempting to resume suspended AudioContext...')
       try {
         // Add null check before calling resume
         if (!this.audioContext) throw new Error('AudioContext became null before resume')
@@ -122,7 +122,7 @@ export class AudioContextManager {
         // Add null check before accessing state after await
         if (!this.audioContext) throw new Error('AudioContext became null after resume')
         // The await succeeded, so the state must be 'running'
-        console.log(`AudioContext resumed successfully, state: ${this.audioContext.state}`)
+        console.info(`AudioContext resumed successfully, state: ${this.audioContext.state}`)
         this.isAutoplayBlocked = false
         return { resumed: true, blocked: false }
       } catch (err) {
@@ -143,7 +143,7 @@ export class AudioContextManager {
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         await this.audioContext.close()
-        console.log('AudioContext closed successfully.')
+        console.info('AudioContext closed successfully.')
       } catch (err: unknown) {
         console.warn(
           'Error closing audio context:',
