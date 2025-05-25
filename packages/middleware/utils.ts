@@ -3,9 +3,8 @@ const getIsProduction = (): boolean => {
     return true
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const globalObj: any = typeof globalThis !== 'undefined' ? globalThis : {}
-  if (globalObj?.import?.meta?.env?.PROD === true) {
+  const globalObj = typeof globalThis !== 'undefined' ? globalThis : {}
+  if (globalObj['import']?.meta?.env?.PROD === true) {
     return true
   }
 

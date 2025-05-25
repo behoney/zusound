@@ -135,7 +135,7 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
     if (ctx.state === 'running') {
       canPlayAudio = true
     } else if (ctx.state === 'suspended') {
-      console.log(`Audio context suspended before playing chunk ${chunk.id}. Attempting resume...`)
+      console.info(`Audio context suspended before playing chunk ${chunk.id}. Attempting resume...`)
       const { resumed } = await audioManager.tryResumeAudioContext()
       if (resumed) {
         canPlayAudio = true
@@ -324,7 +324,6 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
 export function sonifyChanges<T extends DiffChunk>(diff: T, duration: number): void {
   try {
     const sonicChunk = diffToSonic(diff, duration)
-    // console.log('sonicChunk from sonifyChanges:', sonicChunk) // Keep for debugging if needed
 
     // Stagger playback slightly if multiple changes occur rapidly, though currently called per diffChunk
     // setTimeout is 0, so it's more about deferring to next tick.
