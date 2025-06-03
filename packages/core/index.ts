@@ -1,6 +1,6 @@
-import { coreImpl, CoreOptions } from './core'
+import { coreImpl, CoreOptions, AnomalyDetectionConfig } from './core'
 
 const core = coreImpl
 
-export type { CoreOptions }
+export type { CoreOptions, AnomalyDetectionConfig }
 export default core

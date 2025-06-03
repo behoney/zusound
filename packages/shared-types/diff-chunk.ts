@@ -19,4 +19,10 @@ export type DiffChunk = {
 
   /** Algorithm-determined value */
   diffPower: number
+
+  /** Optional alert level for critical state watchers */
+  alertLevel?: 'critical' | 'warning'
+
+  /** Optional watch path configuration that matched this change */
+  watchConfig?: import('./watch-path-config').WatchPathConfig
 }

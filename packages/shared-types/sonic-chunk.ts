@@ -22,4 +22,16 @@ export type SonicChunk = {
 
   /** Pitch adjustment in cents (-600 to 600) */
   detune: number
+
+  /** Optional alert level for critical state watchers */
+  alertLevel?: 'critical' | 'warning'
+
+  /** Flag indicating this is from a critical path watcher */
+  isCriticalPath?: boolean
+
+  /** Flag indicating this is an anomaly alert */
+  isAnomaly?: boolean
+
+  /** Anomaly type for specific audio patterns */
+  anomalyType?: 'rapid-change'
 }
