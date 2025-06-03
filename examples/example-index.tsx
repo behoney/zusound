@@ -48,7 +48,7 @@ const exampleLinks: ExampleLink[] = [
     description:
       'Showcases the engine that detects rapid, repetitive state changes (e.g., potential infinite loops). Triggers distinct urgent sounds and logs console warnings. Includes source code viewer.',
     path: '/anomaly-detection',
-    image: `${import.meta.env.BASE_URL}examples/assets/anomaly-detection.png`,
+    image: `${import.meta.env.BASE_URL}examples/assets/anomaly-detection.jpeg`,
   },
 ]
 
