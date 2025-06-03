@@ -42,6 +42,14 @@ const exampleLinks: ExampleLink[] = [
     path: '/visualizer',
     image: `${import.meta.env.BASE_URL}examples/assets/visualizer.png`,
   },
+  {
+    id: 'anomaly-detection',
+    title: 'State Anomaly Detection',
+    description:
+      'Showcases the engine that detects rapid, repetitive state changes (e.g., potential infinite loops). Triggers distinct urgent sounds and logs console warnings. Includes source code viewer.',
+    path: '/anomaly-detection',
+    image: `${import.meta.env.BASE_URL}examples/assets/anomaly-detection.jpeg`,
+  },
 ]
 
 function ExampleCard({ example }: { example: ExampleLink }) {

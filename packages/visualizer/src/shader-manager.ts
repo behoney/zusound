@@ -36,6 +36,8 @@ export class VisualizerShaderManager {
     uniform float u_eventMagnitude[${MAX_VISIBLE_EVENTS}];
     uniform float u_eventDetune[${MAX_VISIBLE_EVENTS}];
     uniform int u_eventType[${MAX_VISIBLE_EVENTS}]; // 0=sine, 1=square, 2=sawtooth, 3=triangle
+    uniform int u_eventAlertLevel[${MAX_VISIBLE_EVENTS}]; // 0=none, 1=warning, 2=critical
+    uniform bool u_eventIsCriticalPath[${MAX_VISIBLE_EVENTS}];
     
     // Function to get color based on waveform type
     vec3 getTypeColor(int type) {
@@ -43,6 +45,13 @@ export class VisualizerShaderManager {
       if (type == 1) return vec3(1.0, 0.5, 0.2); // square - orange
       if (type == 2) return vec3(0.2, 1.0, 0.5); // sawtooth - green
       return vec3(1.0, 0.3, 0.8); // triangle - pink
+    }
+    
+    // Function to get alert color based on alert level
+    vec3 getAlertColor(int alertLevel) {
+      if (alertLevel == 2) return vec3(1.0, 0.1, 0.1); // critical - bright red
+      if (alertLevel == 1) return vec3(1.0, 0.7, 0.2); // warning - orange/amber
+      return vec3(1.0, 1.0, 1.0); // normal - white
     }
     
     // Function to simulate wave shape based on type
@@ -75,15 +84,36 @@ export class VisualizerShaderManager {
         float detune = u_eventDetune[i] / 1200.0; // Convert cents to octave fraction
         float scaledFreq = frequency * pow(2.0, detune); // Apply detune
         int type = u_eventType[i];
+        int alertLevel = u_eventAlertLevel[i];
+        bool isCriticalPath = u_eventIsCriticalPath[i];
         
         // Calculate visibility based on progress (fade in/out)
         float fadeIn = smoothstep(0.0, 0.1, progress);
         float fadeOut = 1.0 - smoothstep(0.7, 1.0, progress);
         float visibility = fadeIn * fadeOut;
         
+        // Enhanced visibility for critical paths
+        if (isCriticalPath) {
+          if (alertLevel == 2) { // critical
+            visibility *= 1.5; // 50% more visible
+            // Add pulsing effect for critical events
+            visibility *= 1.0 + 0.3 * sin(progress * 20.0);
+          } else if (alertLevel == 1) { // warning
+            visibility *= 1.2; // 20% more visible
+            // Add gentle glow for warning events
+            visibility *= 1.0 + 0.15 * sin(progress * 10.0);
+          }
+        }
+        
         // Calculate effect based on distance from center and wave shape
         float dist = length(p);
         float ringWidth = 0.05 * magnitude; // Ring width depends on magnitude
+        
+        // Enhanced ring width for critical paths
+        if (isCriticalPath) {
+          ringWidth *= (alertLevel == 2) ? 1.8 : 1.4;
+        }
+        
         float ringSize = 0.3 + 0.7 * (1.0 - progress); // Ring expands outwards as progress decreases
         
         // Create a smooth ring shape
@@ -93,9 +123,21 @@ export class VisualizerShaderManager {
         // Add ripples based on wave shape and frequency
         float ripples = getWaveShape(type, dist * 10.0 * scaledFreq);
         
+        // Choose color based on alert level or default type color
+        vec3 eventColor;
+        if (isCriticalPath && alertLevel > 0) {
+          eventColor = getAlertColor(alertLevel);
+        } else {
+          eventColor = getTypeColor(type);
+        }
+        
         // Combine ring and ripples, apply visibility and magnitude
-        vec3 eventColor = getTypeColor(type);
         float eventEffect = (ring * 0.8 + ripples * 0.2) * visibility * magnitude;
+        
+        // Enhanced intensity for critical paths
+        if (isCriticalPath) {
+          eventEffect *= (alertLevel == 2) ? 1.8 : 1.3;
+        }
         
         // Add event's color contribution
         color += eventColor * eventEffect;
@@ -184,6 +226,14 @@ export class VisualizerShaderManager {
           this.program,
           `u_eventType[${i}]`
         )
+        this.uniforms[`u_eventAlertLevel[${i}]`] = this.gl.getUniformLocation(
+          this.program,
+          `u_eventAlertLevel[${i}]`
+        )
+        this.uniforms[`u_eventIsCriticalPath[${i}]`] = this.gl.getUniformLocation(
+          this.program,
+          `u_eventIsCriticalPath[${i}]`
+        )
       }
 
       return true
@@ -251,12 +301,20 @@ export class VisualizerShaderManager {
       custom: 3,
     }
 
+    const alertLevelMapping = {
+      none: 0,
+      warning: 1,
+      critical: 2,
+    }
+
     for (let i = 0; i < MAX_VISIBLE_EVENTS; i++) {
       const uniformProgress = this.uniforms[`u_eventProgress[${i}]`]
       const uniformFrequency = this.uniforms[`u_eventFrequency[${i}]`]
       const uniformMagnitude = this.uniforms[`u_eventMagnitude[${i}]`]
       const uniformDetune = this.uniforms[`u_eventDetune[${i}]`]
       const uniformType = this.uniforms[`u_eventType[${i}]`]
+      const uniformAlertLevel = this.uniforms[`u_eventAlertLevel[${i}]`]
+      const uniformIsCriticalPath = this.uniforms[`u_eventIsCriticalPath[${i}]`]
 
       if (i < events.length) {
         const event = events[i]
@@ -266,9 +324,18 @@ export class VisualizerShaderManager {
         this.gl.uniform1f(uniformMagnitude, chunk.magnitude)
         this.gl.uniform1f(uniformDetune, chunk.detune)
         this.gl.uniform1i(uniformType, typeMapping[chunk.type] ?? 3) // Default to triangle if type is unknown
+
+        // Map alert level to integer for shader
+        const alertLevelInt = chunk.alertLevel ? alertLevelMapping[chunk.alertLevel] : 0
+        this.gl.uniform1i(uniformAlertLevel, alertLevelInt)
+
+        // Convert boolean to integer for shader (WebGL doesn't have native boolean uniforms in older versions)
+        this.gl.uniform1i(uniformIsCriticalPath, chunk.isCriticalPath ? 1 : 0)
       } else {
         // Mark remaining uniform slots as inactive (progress >= 1.0)
         this.gl.uniform1f(uniformProgress, 1.0)
+        this.gl.uniform1i(uniformAlertLevel, 0)
+        this.gl.uniform1i(uniformIsCriticalPath, 0)
       }
     }
   }

@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   BrowserRouter,
   Routes as RouterRoutes,
@@ -5,8 +6,14 @@ import {
   Link as RouterLink,
   useNavigate,
   useLocation,
+  Navigate,
+  RouteProps,
 } from 'react-router-dom'
-import React from 'react'
+import MiddlewareExample from './middlewares/middlewares-example'
+import VisualizerExample from './visualizer-example/visualizer-example'
+import AnomalyDetectionExample from './anomaly-detection/anomaly-detection-example'
+import BasicExample from './basic-example/basic-example'
+import { TodoApp } from './todo-app/todo-example'
 
 // Interface definitions for props
 interface RouterProviderProps {
@@ -51,3 +58,40 @@ export const Route = RouterRoute
 
 // Routes component - directly export React Router's Routes
 export const Routes = RouterRoutes
+
+// Define the routes array for use in App.tsx or a similar top-level component
+export type AppRouteObject = Pick<RouteProps, 'path' | 'element'> & {
+  handle?: { title: string }
+}
+
+export const appRoutes: AppRouteObject[] = [
+  {
+    path: '/',
+    element: <Navigate to="/basic" />
+  },
+  {
+    path: '/basic',
+    element: <BasicExample />,
+    handle: { title: 'Basic Example' }
+  },
+  {
+    path: '/todo',
+    element: <TodoApp />,
+    handle: { title: 'Todo App' }
+  },
+  {
+    path: '/middlewares',
+    element: <MiddlewareExample />,
+    handle: { title: 'Middlewares' }
+  },
+  {
+    path: '/visualizer',
+    element: <VisualizerExample />,
+    handle: { title: 'Visualizer' }
+  },
+  {
+    path: '/anomaly-detection',
+    element: <AnomalyDetectionExample />,
+    handle: { title: 'Anomaly Detection' }
+  }
+]

@@ -3,6 +3,7 @@ import {
   ZusoundSoundEvent,
   SONIC_CHUNK_EVENT_NAME,
   SonicChunk,
+  AlertLevel,
 } from '../../shared-types'
 import { VisualizerShaderManager } from './shader-manager'
 import { EVENT_LIFETIME_MS, MAX_VISIBLE_EVENTS, VISUALIZER_SIZE } from './config'
@@ -13,6 +14,16 @@ export interface VisualizerEvent {
   startTime: number
   /** Calculate progress from 0 to 1 representing the event's lifetime */
   getProgress: () => number
+  /** Optional alert level for critical state watchers */
+  alertLevel?: AlertLevel
+  /** Flag indicating this is from a critical path watcher */
+  isCriticalPath?: boolean
+  /** Optional custom visual properties */
+  customVisual?: {
+    color?: string
+    intensity?: 'low' | 'medium' | 'high'
+    effect?: 'glow' | 'pulse' | 'flash'
+  }
 }
 
 /**
@@ -117,6 +128,17 @@ export class Visualizer {
       startTime: now,
       // Calculate progress dynamically based on current time
       getProgress: () => Math.min(1, (performance.now() - event.startTime) / EVENT_LIFETIME_MS),
+      alertLevel: chunk.alertLevel,
+      isCriticalPath: chunk.isCriticalPath,
+      // Extract custom visual properties if available
+      // Note: customVisual properties would come from the watchConfig in the original DiffChunk
+      // For now, we'll use default enhancements based on alert level
+      customVisual: chunk.alertLevel
+        ? {
+            intensity: chunk.alertLevel === 'critical' ? 'high' : 'medium',
+            effect: chunk.alertLevel === 'critical' ? 'pulse' : 'glow',
+          }
+        : undefined,
     }
 
     // Add the new event and maintain the maximum queue size

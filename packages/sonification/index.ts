@@ -1,1 +1,1 @@
-export { sonifyChanges } from './sonification'
+export { sonifyChanges, sonifyAnomaly, anomalyToSonic, playAnomalySonicChunk } from './sonification'

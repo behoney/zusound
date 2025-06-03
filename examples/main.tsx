@@ -8,6 +8,7 @@ import { Header } from './header'
 import Clarity from '@microsoft/clarity'
 import Middlewares from './middlewares/middlewares-example'
 import VisualizerExample from './visualizer-example/visualizer-example'
+import AnomalyDetectionExample from './anomaly-detection/anomaly-detection-example'
 
 // Create App container component with the header and main content area
 function App() {
@@ -28,6 +29,7 @@ function App() {
             <Route path="/todo" element={<TodoApp />} />
             <Route path="/middlewares" element={<Middlewares />} />
             <Route path="/visualizer" element={<VisualizerExample />} />
+            <Route path="/anomaly-detection" element={<AnomalyDetectionExample />} />
           </Routes>
         </main>
       </div>

@@ -1,14 +1,26 @@
 import { AUDIO_CONFIG } from './constants'
 import { AudioContextManager } from './utils'
-import { SONIC_CHUNK_EVENT_NAME, SonicChunk, DiffChunk, ZusoundSoundEvent } from '../shared-types'
+import {
+  SONIC_CHUNK_EVENT_NAME,
+  SonicChunk,
+  DiffChunk,
+  AnomalyChunk,
+  ZusoundSoundEvent,
+  WatchPathConfig,
+} from '../shared-types'
 
 /**
  * Convert a diff object to sonic chunks that represent sounds
  * @param diff - Object containing changes to be sonified
  * @param duration - Base duration for each sonic chunk in milliseconds
+ * @param watchConfig - Optional watch path configuration for enhanced feedback
  * @returns Array of SonicChunk objects representing sounds to play
  */
-export function diffToSonic<T extends DiffChunk>(diff: T, duration = 50): SonicChunk {
+export function diffToSonic<T extends DiffChunk>(
+  diff: T,
+  duration = 50,
+  watchConfig?: WatchPathConfig
+): SonicChunk {
   if (!diff || Object.keys(diff).length === 0) {
     return {
       id: '',
@@ -100,14 +112,56 @@ export function diffToSonic<T extends DiffChunk>(diff: T, duration = 50): SonicC
       ? AUDIO_CONFIG.DEFAULT_MAGNITUDE.REMOVE
       : AUDIO_CONFIG.DEFAULT_MAGNITUDE.CHANGE
 
-  return {
-    id: diff.path, // Use the path as the SonicChunk ID
-    type: waveType,
-    frequency,
-    magnitude,
-    duration: Math.max(duration, AUDIO_CONFIG.MIN_DURATION_MS),
-    detune: detuneCents,
+  // --- Critical State Watcher Enhancements ---
+  let enhancedDuration = Math.max(duration, AUDIO_CONFIG.MIN_DURATION_MS)
+  let enhancedFrequency = frequency
+  let enhancedDetune = detuneCents
+  let enhancedMagnitude = magnitude
+  let enhancedWaveType = waveType
+
+  if (watchConfig) {
+    // Apply custom sound overrides if provided
+    if (watchConfig.customSound) {
+      const custom = watchConfig.customSound
+      if (custom.frequency !== undefined) enhancedFrequency = custom.frequency
+      if (custom.magnitude !== undefined) enhancedMagnitude = custom.magnitude
+      if (custom.duration !== undefined)
+        enhancedDuration = Math.max(custom.duration, AUDIO_CONFIG.MIN_DURATION_MS)
+      if (custom.detune !== undefined) enhancedDetune = custom.detune
+      if (custom.type !== undefined) {
+        // If custom type is 'custom', use a fallback for enhancedWaveType directly
+        // to satisfy linter, though playSonicChunk handles 'custom' at playback.
+        // This means SonicChunk.type won't carry 'custom' if set via watchConfig.
+        enhancedWaveType = custom.type === 'custom' ? 'sine' : custom.type
+      }
+    } else {
+      // Apply default alert level enhancements
+      if (watchConfig.alertLevel === 'critical') {
+        enhancedMagnitude *= 1.5 // 50% louder
+        enhancedDetune += 200 // +200 cents for distinctiveness
+        enhancedDuration *= 1.3 // 30% longer
+        enhancedFrequency *= 1.1 // Slightly higher pitch
+      } else if (watchConfig.alertLevel === 'warning') {
+        enhancedMagnitude *= 1.2 // 20% louder
+        enhancedDetune += 100 // +100 cents for distinctiveness
+        enhancedDuration *= 1.1 // 10% longer
+        enhancedFrequency *= 1.05 // Slightly higher pitch
+      }
+    }
   }
+
+  const sonicChunk: SonicChunk = {
+    id: diff.path, // Use the path as the SonicChunk ID
+    type: enhancedWaveType,
+    frequency: enhancedFrequency,
+    magnitude: Math.min(enhancedMagnitude, 1.0), // Cap at 1.0
+    duration: enhancedDuration,
+    detune: Math.max(-600, Math.min(600, enhancedDetune)), // Cap detune range
+    alertLevel: diff.alertLevel,
+    isCriticalPath: !!watchConfig,
+  }
+
+  return sonicChunk
 }
 
 /**
@@ -320,10 +374,15 @@ export async function playSonicChunk(chunk: SonicChunk): Promise<boolean> {
  * The visualizer component receives these events through the window event system.
  * @param diff - The state change to sonify
  * @param duration - Duration of the sound in milliseconds
+ * @param watchConfig - Optional watch path configuration for enhanced feedback
  */
-export function sonifyChanges<T extends DiffChunk>(diff: T, duration: number): void {
+export function sonifyChanges<T extends DiffChunk>(
+  diff: T,
+  duration: number,
+  watchConfig?: WatchPathConfig
+): void {
   try {
-    const sonicChunk = diffToSonic(diff, duration)
+    const sonicChunk = diffToSonic(diff, duration, watchConfig)
 
     // Stagger playback slightly if multiple changes occur rapidly, though currently called per diffChunk
     // setTimeout is 0, so it's more about deferring to next tick.
@@ -334,5 +393,117 @@ export function sonifyChanges<T extends DiffChunk>(diff: T, duration: number): v
     }, 0)
   } catch (err: unknown) {
     console.error('Sonification setup failed:', err instanceof Error ? err.message : String(err))
+  }
+}
+
+/**
+ * Convert anomaly to distinct urgent sonic chunk
+ */
+export function anomalyToSonic(
+  anomaly: AnomalyChunk,
+  customSound?: Partial<SonicChunk>
+): SonicChunk {
+  const baseFreq = 1000 // Prominent warning frequency
+  const severity = anomaly.severity === 'critical' ? 1.5 : 1.0
+
+  // Apply custom overrides or use urgent defaults
+  const sonicChunk: SonicChunk = {
+    id: anomaly.id,
+    type: 'square', // Sharp electronic warning sound
+    frequency: customSound?.frequency ?? baseFreq * severity,
+    magnitude: customSound?.magnitude ?? Math.min(0.7 * severity, 1.0),
+    duration: customSound?.duration ?? 200 * severity, // Longer for attention
+    detune: customSound?.detune ?? 400, // High detune for urgency
+    alertLevel: anomaly.severity,
+    isAnomaly: true,
+    anomalyType: anomaly.type,
+    ...(customSound && customSound),
+  }
+
+  return sonicChunk
+}
+
+/**
+ * Create stuttering rapid-fire anomaly sound pattern
+ */
+async function playRapidChangePattern(chunk: SonicChunk): Promise<boolean> {
+  try {
+    const audioManager = AudioContextManager.getInstance()
+    const ctx = audioManager.getContext()
+
+    if (ctx.state !== 'running') {
+      const { resumed } = await audioManager.tryResumeAudioContext()
+      if (!resumed) return false
+    }
+
+    const now = ctx.currentTime
+    const burstCount = 3 // Three rapid bursts
+    const burstDuration = chunk.duration / 1000 / burstCount
+    const burstGap = burstDuration * 0.3
+
+    for (let i = 0; i < burstCount; i++) {
+      const startTime = now + i * (burstDuration + burstGap)
+      const frequency = chunk.frequency * (1 + i * 0.1) // Rising pitch
+
+      const oscillator = ctx.createOscillator()
+      const gainNode = ctx.createGain()
+
+      oscillator.type = chunk.type === 'custom' ? 'square' : chunk.type
+      oscillator.frequency.setValueAtTime(frequency, startTime)
+      oscillator.detune.setValueAtTime(chunk.detune, startTime)
+
+      gainNode.gain.setValueAtTime(0, startTime)
+      gainNode.gain.exponentialRampToValueAtTime(chunk.magnitude, startTime + 0.01)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + burstDuration)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      oscillator.start(startTime)
+      oscillator.stop(startTime + burstDuration)
+    }
+
+    return true
+  } catch (err) {
+    console.error('Anomaly pattern playback failed:', err)
+    return false
+  }
+}
+
+/**
+ * Play anomaly-specific audio with urgent patterns
+ */
+export async function playAnomalySonicChunk(chunk: SonicChunk): Promise<boolean> {
+  // Dispatch event for visualization first
+  if (typeof window !== 'undefined') {
+    const event: ZusoundSoundEvent = new CustomEvent(SONIC_CHUNK_EVENT_NAME, {
+      detail: { chunk },
+    })
+    window.dispatchEvent(event)
+  }
+
+  // Use specialized pattern for rapid-change anomalies
+  if (chunk.anomalyType === 'rapid-change') {
+    return playRapidChangePattern(chunk)
+  }
+
+  // Fallback to enhanced regular playback
+  return playSonicChunk(chunk)
+}
+
+/**
+ * Convert anomaly to sound and trigger playback
+ */
+export function sonifyAnomaly(anomaly: AnomalyChunk, customSound?: Partial<SonicChunk>): void {
+  try {
+    const sonicChunk = anomalyToSonic(anomaly, customSound)
+
+    setTimeout(() => {
+      playAnomalySonicChunk(sonicChunk).catch(err => {
+        console.error(`Anomaly playback failed for ${sonicChunk.id}:`, err)
+      })
+    }, 0)
+  } catch (err) {
+    console.error('Anomaly sonification setup failed:', err)
   }
 }
